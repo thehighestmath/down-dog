@@ -20,6 +20,7 @@ s3 = boto3.client(
 
 # 1. Создаем bucket (если его нет)
 try:
+
     s3.create_bucket(Bucket=BUCKET_NAME)
     print(f'✅ Бакет "{BUCKET_NAME}" создан')
 except Exception as e:
