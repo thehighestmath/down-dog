@@ -21,9 +21,12 @@ def create_s3_client():
 
         s3.create_bucket(Bucket=os.getenv('BUCKET_NAME'))
         print(f'✅ Бакет "{os.getenv('BUCKET_NAME')}" создан')
-    except Exception as e:
-        print(f'ℹ️ Бакет уже существует или ошибка: {e}')
+    except Exception as error:
+        print(f'ℹ️ Бакет уже существует или ошибка: {error}')
+    return s3
 
+
+def create_image(s3):
     # 2. Загружаем изображения
     images_folder = './Картинки с позами/'  # папка с картинками
     for filename in os.listdir(images_folder):
@@ -38,4 +41,10 @@ def create_s3_client():
     print('🎉 Готово!')
 
 
-create_s3_client()
+def main(s3):
+    create_s3_client()
+    create_image(s3)
+
+
+if __name__ == '__main__':
+    main()
