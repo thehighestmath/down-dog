@@ -41,8 +41,8 @@ def create_image(s3):
     print('🎉 Готово!')
 
 
-def main(s3):
-    create_s3_client()
+def main():
+    s3 = create_s3_client()
     create_image(s3)
 
 
