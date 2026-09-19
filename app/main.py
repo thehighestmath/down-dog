@@ -1,11 +1,8 @@
-from http.client import HTTPException
-
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 import pandas as pd
 import uuid
 import os
-import sys
 from app.generator import tren, get_poses_by_focus
 
 app = FastAPI()

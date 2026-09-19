@@ -1,6 +1,3 @@
-import pandas as pd
-
-
 def get_poses_by_focus(df, focus):
 
     if focus is None or focus == "full_body":
