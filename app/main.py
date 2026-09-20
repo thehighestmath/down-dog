@@ -96,11 +96,11 @@ def generate_workout(request: WorkoutRequest):
     # Проверяем уровень
     # -------------------------------------
 
-    allowed_levels = [
+    allowed_levels = {
         "beginner",
         "intermediate",
         "advanced"
-    ]
+    }
 
     if request.level not in allowed_levels:
         raise HTTPException(
@@ -112,13 +112,7 @@ def generate_workout(request: WorkoutRequest):
     # Проверяем фокус
     # -------------------------------------
 
-    allowed_focus = [
-        "back",
-        "neck",
-        "legs",
-        "full_body",
-        "relaxation"
-    ]
+    allowed_focus = {"back", "neck", "legs", "full_body", "relaxation"}
 
     if request.focus not in allowed_focus:
         raise HTTPException(
