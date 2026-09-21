@@ -1,5 +1,11 @@
-def get_poses_by_focus(df, focus):
+from typing import Optional, List
 
+import pandas as pd
+
+
+def get_poses_by_focus(df: pd.DataFrame,
+                       focus: Optional[str],
+                       ) -> pd.DataFrame:
     if focus is None or focus == "full_body":
         return df
 
@@ -46,15 +52,17 @@ def get_poses_by_focus(df, focus):
     return df.loc[selected_rows]
 
 
-def time_realize_warm(t_max, poses):
-
+def time_realize_warm(
+        t_max: int,
+        poses: pd.DataFrame,
+) -> List[str]:
     result = []
 
     while t_max > 0 and not poses.empty:
 
         possible = poses[
             poses["Сложность (1-4)"] <= 2
-        ]
+            ]
 
         if possible.empty:
             break
@@ -73,15 +81,17 @@ def time_realize_warm(t_max, poses):
     return result
 
 
-def time_realize_mid(t_max, poses):
-
+def time_realize_mid(
+        t_max: int,
+        poses: pd.DataFrame,
+) -> List[str]:
     result = []
 
     while t_max > 0 and not poses.empty:
 
         possible = poses[
             poses["Сложность (1-4)"] == 3
-        ]
+            ]
 
         if possible.empty:
             break
@@ -100,15 +110,17 @@ def time_realize_mid(t_max, poses):
     return result
 
 
-def time_realize_hard(t_max, poses):
-
+def time_realize_hard(
+        t_max: int,
+        poses: pd.DataFrame,
+) -> List[str]:
     result = []
 
     while t_max > 0 and not poses.empty:
 
         possible = poses[
             poses["Сложность (1-4)"] >= 4
-        ]
+            ]
 
         if possible.empty:
             break
@@ -127,65 +139,33 @@ def time_realize_hard(t_max, poses):
     return result
 
 
-def tren(df, level, duration, focus=None):
-
+def tren(
+        df: pd.DataFrame,
+        level: str,
+        duration: int,
+        focus: Optional[str] = None,
+) -> List[str]:
     poses = get_poses_by_focus(df, focus)
-
     if poses.empty:
         return []
 
-    if level == "beginner":
+    plans = {
+        "beginner": [
+            (time_realize_warm, 1, 1),
+        ],
+        "intermediate": [
+            (time_realize_warm, 1, 3),
+            (time_realize_mid, 2, 3),
+        ],
+        "advanced": [
+            (time_realize_hard, 1, 5),
+            (time_realize_mid, 3, 5),
+            (time_realize_hard, 1, 5),
+        ],
+    }
 
-        return time_realize_warm(
-            duration,
-            poses
-        )
+    result = []
+    for func, num, den in plans.get(level, []):
+        result.extend(func(duration * num // den, poses))
 
-    elif level == "intermediate":
-
-        result = []
-
-        result.extend(
-            time_realize_warm(
-                duration // 3,
-                poses
-            )
-        )
-
-        result.extend(
-            time_realize_mid(
-                duration * 2 // 3,
-                poses
-            )
-        )
-
-        return result
-
-    elif level == "advanced":
-
-        result = []
-
-        result.extend(
-            time_realize_hard(
-                duration // 5,
-                poses
-            )
-        )
-
-        result.extend(
-            time_realize_mid(
-                duration * 3 // 5,
-                poses
-            )
-        )
-
-        result.extend(
-            time_realize_hard(
-                duration // 5,
-                poses
-            )
-        )
-
-        return result
-
-    return []
+    return result
