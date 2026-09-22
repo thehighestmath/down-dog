@@ -1,0 +1,15 @@
+[project]
+name = "down-dog"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+# Python-версия, под которую пишем код (в коде используется синтаксис PEP 701)
+target-version = "py312"
+# Максимальная длина строки
+line-length = 88
+
+[tool.ruff.lint]
+# Правила: E/Pyflakes-ошибки, F/имя-не-используется и пр., W/предупреждения,
+# I/порядок импортов, B/часто встречающиеся баги (bugbear)
+select = ["E", "F", "W", "I", "B"]
