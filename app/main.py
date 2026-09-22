@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Request, HTTPException
-from pydantic import BaseModel
-import pandas as pd
-import uuid
 import os
-from app.generator import tren, get_poses_by_focus
+import uuid
+
+import pandas as pd
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+from app.generator import get_poses_by_focus, tren
 
 app = FastAPI()
 

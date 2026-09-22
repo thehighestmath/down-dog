@@ -1,5 +1,5 @@
-import pytest
 import pandas as pd
+
 from app.generator import tren
 
 
