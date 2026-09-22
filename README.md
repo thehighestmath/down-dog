@@ -164,3 +164,337 @@ Docker Desktop
               ▼
           Изображения
 ```
+# Документация по запуску FastAPI
+
+В этом проекте **FastAPI** используется для создания backend API приложения Down Dog.
+Для запуска FastAPI используется **Uvicorn**.
+
+## 1. Создание виртуального окружения
+
+> **Важно:** этот шаг выполняется только один раз — при первой настройке проекта.
+
+Откройте терминал (**PowerShell**, **cmd** или **WSL**) и перейдите в корневую папку проекта:
+
+```bash
+cd путь_к_проекту
+```
+
+Создайте виртуальное окружение:
+
+```bash
+python -m venv .venv
+```
+
+### Активация виртуального окружения
+
+Для Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Для Windows CMD:
+
+```cmd
+.venv\Scripts\activate.bat
+```
+
+После активации в терминале должно появиться:
+
+```text
+(.venv)
+```
+
+## 2. Установка FastAPI и Uvicorn
+
+В активированном виртуальном окружении выполните:
+
+```bash
+pip install fastapi uvicorn
+```
+
+### Проверка установки
+
+```bash
+pip show fastapi
+pip show uvicorn
+```
+
+## 3. Структура проекта
+
+Пример минимальной структуры:
+
+```text
+down-dog/
+│
+├── app/
+│   ├── __init__.py
+│   └── main.py
+│
+├── .venv/
+├── requirements.txt
+├── .gitignore
+├── .env
+├── .env.example
+└── README.md
+```
+
+Основной файл FastAPI:
+
+```text
+app/main.py
+```
+
+## 4. Запуск FastAPI
+
+Из визуального окружения выполните:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+### Параметры команды
+
+| Параметр | Назначение |
+|---|---|
+| `app.main` | Файл `app/main.py` |
+| `app` | Объект FastAPI с именем `app` |
+| `--reload` | Автоматический перезапуск сервера после изменения кода |
+
+После успешного запуска API будет доступно:
+
+```text
+http://127.0.0.1:8000
+```
+
+## 5. Проверка FastAPI
+
+Откройте в браузере:
+
+```text
+http://127.0.0.1:8000
+```
+
+Если в `main.py` используется тестовый endpoint:
+
+```python
+@app.get("/")
+def root():
+    return {"message": "Down Dog API"}
+```
+
+ожидаемый ответ:
+
+```json
+{"message":"Down Dog API"}
+```
+
+## 6. Swagger / OpenAPI
+
+FastAPI автоматически создаёт интерактивную документацию API.
+
+Откройте:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Также доступна альтернативная документация:
+
+```text
+http://127.0.0.1:8000/redoc
+```
+
+### Проверка endpoint через Swagger
+
+1. Откройте `/docs`.
+2. Найдите нужный endpoint.
+3. Нажмите **Try it out**.
+4. Укажите необходимые параметры.
+5. Нажмите **Execute**.
+6. Проверьте результат в **Response**.
+
+Для текущей задачи Down Dog API должны использоваться:
+
+```text
+GET  /api/poses
+POST /api/workouts/generate
+GET  /api/workouts/{id}
+```
+
+## 7. Сохранение зависимостей
+
+После установки библиотек создайте или обновите `requirements.txt`:
+
+```bash
+pip freeze > requirements.txt
+```
+
+В `requirements.txt` должны присутствовать установленные зависимости, включая:
+
+```text
+fastapi
+uvicorn
+```
+
+В репозитории рекомендуется хранить `.env.example` с примерами переменных без реальных секретов.
+
+## 8. Последующие запуски
+
+> После перезагрузки компьютера или остановки работы **создавать виртуальное окружение заново и устанавливать FastAPI повторно не нужно**.
+
+### 8.1. Перейдите в папку проекта
+
+```bash
+cd путь_к_проекту
+```
+
+### 8.2. Активируйте виртуальное окружение
+
+Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Windows CMD:
+
+```cmd
+.venv\Scripts\activate.bat
+```
+
+### 8.3. Запустите FastAPI
+
+```bash
+uvicorn app.main:app --reload
+```
+
+## 9. Если Uvicorn не запускается
+
+Если появилась ошибка:
+
+```text
+'uvicorn' is not recognized
+```
+
+Проверьте, что виртуальное окружение активировано:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Проверьте установку:
+
+```bash
+pip show uvicorn
+```
+
+При необходимости установите:
+
+```bash
+pip install uvicorn
+```
+
+Также можно использовать:
+
+```bash
+python -m uvicorn app.main:app --reload
+```
+
+## 10. Если появилась ошибка импорта
+
+Если команда:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+выдаёт ошибку импорта, проверьте:
+
+1. Вы находитесь в корневой папке проекта.
+2. Существует файл `app/main.py`.
+3. В `main.py` есть объект FastAPI с именем `app`.
+4. Виртуальное окружение активировано.
+
+Команда:
+
+```text
+app.main:app
+```
+
+означает:
+
+```text
+app/       → папка
+main.py    → файл
+app        → объект FastAPI
+```
+
+## 11. Остановка FastAPI
+
+Для остановки сервера в терминале нажмите:
+
+```text
+Ctrl + C
+```
+
+## 12. Порядок работы в проекте Down Dog
+
+После запуска FastAPI:
+
+1. Проверить `/`.
+2. Проверить `/docs`.
+3. Проверить существующие endpoint.
+4. Обновить `requirements.txt`.
+5. Реализовать `GET /api/poses`.
+6. Добавить фильтры `category`, `difficulty` и `focus`.
+7. Реализовать rule-based генератор тренировок.
+8. Добавить `POST /api/workouts/generate`.
+9. Добавить `GET /api/workouts/{id}`.
+10. Написать тесты.
+
+## 13. Связь FastAPI и MinIO
+
+FastAPI и MinIO выполняют разные задачи.
+
+```text
+FastAPI
+   │
+   └── Backend API
+          │
+          └── Данные и логика приложения
+
+MinIO
+   │
+   └── S3-хранилище
+          │
+          └── Изображения поз
+```
+
+MinIO уже создан и настроен отдельно.
+При запуске FastAPI повторно создавать Docker-контейнер
+или bucket не требуется.
+
+---
+
+## Краткая схема запуска
+
+```text
+Терминал
+   │
+   ▼
+Папка проекта
+   │
+   ▼
+Активация .venv
+   │
+   ▼
+uvicorn app.main:app --reload
+   │
+   ▼
+http://127.0.0.1:8000
+   │
+   ├── API
+   │
+   └── Swagger → /docs
+```
