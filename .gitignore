@@ -220,4 +220,12 @@ __marimo__/
 .streamlit/secrets.toml
 
 .env/
+
+# Node.js
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
 .idea/
