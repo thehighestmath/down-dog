@@ -398,7 +398,7 @@ TTS_TEMPLATES = {
     "breathing": "Сделайте глубокий вдох... и медленный выдох.",
     "hold": "Держите позу... ещё {seconds} секунд.",
     "transition": "Плавно выходим. Переход к следующей позе.",
-    "outro": "Тренировка завершена. Отдохните в Шавасане."
+    "outro": "Тренировка завершена. Отдохните в Шавасане.",
 }
 ```
 
@@ -483,14 +483,15 @@ def generate_workout(duration, level, focus):
     poses = db.query("SELECT * FROM poses WHERE ...")
     return {"poses": split_by_phase(poses)}
 
+
 # Phase 2+ (добавляется сохранение истории)
 def generate_workout(duration, level, focus, user_id=None):
     poses = db.query("SELECT * FROM poses WHERE ...")  # ← тот же запрос
-    workout = {"poses": split_by_phase(poses)}         # ← та же логика
-    
+    workout = {"poses": split_by_phase(poses)}  # ← та же логика
+
     if user_id:
         save_to_history(user_id, workout)  # ← просто доп. шаг
-    
+
     return workout
 ```
 

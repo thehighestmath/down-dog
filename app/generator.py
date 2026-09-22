@@ -3,31 +3,18 @@ from typing import List, Optional
 import pandas as pd
 
 
-def get_poses_by_focus(df: pd.DataFrame,
-                       focus: Optional[str],
-                       ) -> pd.DataFrame:
+def get_poses_by_focus(
+    df: pd.DataFrame,
+    focus: Optional[str],
+) -> pd.DataFrame:
     if focus is None or focus == "full_body":
         return df
 
     focus_map = {
-        "back": [
-            "спина",
-            "поясница",
-            "верхняя часть спины"
-        ],
-        "neck": [
-            "шея"
-        ],
-        "legs": [
-            "ноги",
-            "ягодицы",
-            "квадрицепсы",
-            "икры",
-            "задняя поверхность бедра"
-        ],
-        "relaxation": [
-            "расслабление"
-        ]
+        "back": ["спина", "поясница", "верхняя часть спины"],
+        "neck": ["шея"],
+        "legs": ["ноги", "ягодицы", "квадрицепсы", "икры", "задняя поверхность бедра"],
+        "relaxation": ["расслабление"],
     }
 
     search_words = focus_map.get(focus)
@@ -38,13 +25,9 @@ def get_poses_by_focus(df: pd.DataFrame,
     selected_rows = []
 
     for index, row in df.iterrows():
-
-        muscle_groups = str(
-            row["Фокус (группы мышц)"]
-        ).lower()
+        muscle_groups = str(row["Фокус (группы мышц)"]).lower()
 
         for word in search_words:
-
             if word.lower() in muscle_groups:
                 selected_rows.append(index)
                 break
@@ -53,16 +36,13 @@ def get_poses_by_focus(df: pd.DataFrame,
 
 
 def time_realize_warm(
-        t_max: int,
-        poses: pd.DataFrame,
+    t_max: int,
+    poses: pd.DataFrame,
 ) -> List[str]:
     result = []
 
     while t_max > 0 and not poses.empty:
-
-        possible = poses[
-            poses["Сложность (1-4)"] <= 2
-            ]
+        possible = poses[poses["Сложность (1-4)"] <= 2]
 
         if possible.empty:
             break
@@ -82,16 +62,13 @@ def time_realize_warm(
 
 
 def time_realize_mid(
-        t_max: int,
-        poses: pd.DataFrame,
+    t_max: int,
+    poses: pd.DataFrame,
 ) -> List[str]:
     result = []
 
     while t_max > 0 and not poses.empty:
-
-        possible = poses[
-            poses["Сложность (1-4)"] == 3
-            ]
+        possible = poses[poses["Сложность (1-4)"] == 3]
 
         if possible.empty:
             break
@@ -111,16 +88,13 @@ def time_realize_mid(
 
 
 def time_realize_hard(
-        t_max: int,
-        poses: pd.DataFrame,
+    t_max: int,
+    poses: pd.DataFrame,
 ) -> List[str]:
     result = []
 
     while t_max > 0 and not poses.empty:
-
-        possible = poses[
-            poses["Сложность (1-4)"] >= 4
-            ]
+        possible = poses[poses["Сложность (1-4)"] >= 4]
 
         if possible.empty:
             break
@@ -140,10 +114,10 @@ def time_realize_hard(
 
 
 def tren(
-        df: pd.DataFrame,
-        level: str,
-        duration: int,
-        focus: Optional[str] = None,
+    df: pd.DataFrame,
+    level: str,
+    duration: int,
+    focus: Optional[str] = None,
 ) -> List[str]:
     poses = get_poses_by_focus(df, focus)
     if poses.empty:
