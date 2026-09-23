@@ -1,11 +1,16 @@
 [project]
 name = "down-dog"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
+
+[tool.pytest.ini_options]
+# Добавляет корень проекта в sys.path, чтобы импорт "app" работал
+# и при запуске консольной командой "pytest" (не только "python -m pytest")
+pythonpath = ["."]
 
 [tool.ruff]
-# Python-версия, под которую пишем код (в коде используется синтаксис PEP 701)
-target-version = "py312"
+# Python-версия, под которую пишем код
+target-version = "py314"
 # Максимальная длина строки
 line-length = 88
 

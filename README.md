@@ -498,3 +498,47 @@ http://127.0.0.1:8000
    │
    └── Swagger → /docs
 ```
+
+# Conventional commit messages (pre-commit хук)
+
+Проект использует формат **Conventional Commits** для сообщений коммитов. Формат проверяется на каждом `git commit` хуком `commit-msg` через [pre-commit](https://pre-commit.com).
+
+## Формат сообщения
+
+```text
+type(scope): subject
+```
+
+- **type** — обязателен. Допустимые: `feat`, `fix`, `build`, `chore`, `ci`, `docs`, `style`, `refactor`, `perf`, `test`.
+- **scope** — необязательный контекст изменения, например `auth`, `api`.
+- **subject** — обязателен, не должен заканчиваться точкой.
+- Для ломающих изменений добавьте `!` после type/scope, например `feat!: change`.
+- Сообщения `Merge ...` и `Revert ...` пропускаются автоматически.
+
+Примеры:
+
+```text
+feat: add new feature
+fix(auth): fix login flow
+feat!: breaking change
+```
+
+## Установка (однократно для каждого разработчика)
+
+В активированном виртуальном окружении:
+
+```bash
+pip install pre-commit
+```
+
+Затем в корне проекта зарегистрируйте хук:
+
+```bash
+pre-commit install --hook-type commit-msg
+```
+
+Хук будет выполняться при каждом `git commit`. Убедиться, что он установлен:
+
+```bash
+pre-commit validate-config
+```
