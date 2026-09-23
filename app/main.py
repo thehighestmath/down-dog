@@ -3,12 +3,25 @@ import uuid
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.generator import get_poses_by_focus, tren
 
 app = FastAPI()
 
+origins = [
+    "http://localhost:5173",  # Адрес вашего Vite-приложения
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # Разрешаем GET, POST, PUT, DELETE
+    allow_headers=["*"],
+)
 # Получаем папку, в которой находится текущий скрипт (app)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Соединяем путь к папке с именем файла
