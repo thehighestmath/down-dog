@@ -5,11 +5,11 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from app.generator import get_poses_by_focus, tren
+from backend.generator import get_poses_by_focus, tren
 
 app = FastAPI()
 
-# Получаем папку, в которой находится текущий скрипт (app)
+# Получаем папку, в которой находится текущий скрипт (backend)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Соединяем путь к папке с именем файла
 csv_path = os.path.join(BASE_DIR, "Pose_with_focus.csv")

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from app.generator import tren
+from backend.generator import tren
 
 
 def test_tren_beginner_generates_poses():

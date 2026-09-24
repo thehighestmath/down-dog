@@ -250,7 +250,7 @@ app/main.py
 Из визуального окружения выполните:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn backend.main:backend --reload
 ```
 
 ### Параметры команды
@@ -366,7 +366,7 @@ Windows CMD:
 ### 8.3. Запустите FastAPI
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn backend.main:backend --reload
 ```
 
 ## 9. Если Uvicorn не запускается
@@ -398,7 +398,7 @@ pip install uvicorn
 Также можно использовать:
 
 ```bash
-python -m uvicorn app.main:app --reload
+python -m uvicorn backend.main:backend --reload
 ```
 
 ## 10. Если появилась ошибка импорта
@@ -406,7 +406,7 @@ python -m uvicorn app.main:app --reload
 Если команда:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn backend.main:backend --reload
 ```
 
 выдаёт ошибку импорта, проверьте:
