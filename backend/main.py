@@ -5,9 +5,19 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from backend.generator import get_poses_by_focus, tren
+from generator import get_poses_by_focus, tren
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # для разработки; в проде укажи свой домен
+    allow_credentials=False,      # "*" + credentials=True нельзя вместе
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 # Получаем папку, в которой находится текущий скрипт (backend)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
