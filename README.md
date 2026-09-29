@@ -543,3 +543,21 @@ pre-commit install --hook-type commit-msg
 ```bash
 pre-commit validate-config
 ```
+
+# Документация по запуску проекта через Docker-compose
+
+В начале запускаем Docker(На панели задач должна быть иконка)
+
+Потом в CMD вводим команду запуска
+
+```bash
+docker compose up -d --build
+```
+
+Команда остановки
+
+```bash
+docker compose down
+```
+
+Если не работает, поменяйте образ minio
