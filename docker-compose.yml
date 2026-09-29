@@ -3,7 +3,7 @@ services:
     build: ./backend
     container_name: app-backend
     ports:
-      - "8000:8000"
+      - '8000:8000'
     environment:
       - PYTHONUNBUFFERED=1
       - MINIO_ENDPOINT=http://minio:9000
@@ -21,7 +21,7 @@ services:
     build: ./frontend
     container_name: app-frontend
     ports:
-      - "3000:80"
+      - '3000:80'
     depends_on:
       - backend
     networks:
@@ -36,12 +36,12 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - '9000:9000'
+      - '9001:9001'
     volumes:
       - minio_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      test: ['CMD-SHELL', 'curl -f http://localhost:9000/minio/health/live || exit 1']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -64,7 +64,7 @@ services:
         condition: service_healthy
     networks:
       - app-network
-    restart: "no"
+    restart: 'no'
 
 volumes:
   minio_data:
