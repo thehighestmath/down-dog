@@ -23,15 +23,15 @@ docker run -d --name minio -p 9000:9000 -p 9001:9001 -e "MINIO_ROOT_USER=minioad
 
 ### Параметры команды
 
-| Параметр | Назначение |
-|---|---|
-| `-d` | Запуск контейнера в фоновом режиме |
-| `--name minio` | Имя контейнера |
-| `-p 9000:9000` | Порт для S3 API |
-| `-p 9001:9001` | Порт для веб-консоли |
-| `-e "MINIO_ROOT_USER=..."` | Логин для доступа |
-| `-e "MINIO_ROOT_PASSWORD=..."` | Пароль для доступа |
-| `-v minio_data:/data` | Docker Volume для хранения данных |
+| Параметр                       | Назначение                         |
+| ------------------------------ | ---------------------------------- |
+| `-d`                           | Запуск контейнера в фоновом режиме |
+| `--name minio`                 | Имя контейнера                     |
+| `-p 9000:9000`                 | Порт для S3 API                    |
+| `-p 9001:9001`                 | Порт для веб-консоли               |
+| `-e "MINIO_ROOT_USER=..."`     | Логин для доступа                  |
+| `-e "MINIO_ROOT_PASSWORD=..."` | Пароль для доступа                 |
+| `-v minio_data:/data`          | Docker Volume для хранения данных  |
 
 ### Проверка запуска
 
@@ -164,6 +164,7 @@ Docker Desktop
               ▼
           Изображения
 ```
+
 # Документация по запуску FastAPI
 
 В этом проекте **FastAPI** используется для создания backend API приложения Down Dog.
@@ -250,15 +251,15 @@ app/main.py
 Из визуального окружения выполните:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn backend.main:backend --reload
 ```
 
 ### Параметры команды
 
-| Параметр | Назначение |
-|---|---|
-| `app.main` | Файл `app/main.py` |
-| `app` | Объект FastAPI с именем `app` |
+| Параметр   | Назначение                                             |
+| ---------- | ------------------------------------------------------ |
+| `app.main` | Файл `app/main.py`                                     |
+| `app`      | Объект FastAPI с именем `app`                          |
 | `--reload` | Автоматический перезапуск сервера после изменения кода |
 
 После успешного запуска API будет доступно:
@@ -286,7 +287,7 @@ def root():
 ожидаемый ответ:
 
 ```json
-{"message":"Down Dog API"}
+{ "message": "Down Dog API" }
 ```
 
 ## 6. Swagger / OpenAPI
@@ -366,7 +367,7 @@ Windows CMD:
 ### 8.3. Запустите FastAPI
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn backend.main:backend --reload
 ```
 
 ## 9. Если Uvicorn не запускается
@@ -398,7 +399,7 @@ pip install uvicorn
 Также можно использовать:
 
 ```bash
-python -m uvicorn app.main:app --reload
+python -m uvicorn backend.main:backend --reload
 ```
 
 ## 10. Если появилась ошибка импорта
@@ -406,7 +407,7 @@ python -m uvicorn app.main:app --reload
 Если команда:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn backend.main:backend --reload
 ```
 
 выдаёт ошибку импорта, проверьте:
@@ -542,3 +543,21 @@ pre-commit install --hook-type commit-msg
 ```bash
 pre-commit validate-config
 ```
+
+# Документация по запуску проекта через Docker-compose
+
+В начале запускаем Docker(На панели задач должна быть иконка)
+
+Потом в CMD вводим команду запуска
+
+```bash
+docker compose up -d --build
+```
+
+Команда остановки
+
+```bash
+docker compose down
+```
+
+Если не работает, поменяйте образ minio

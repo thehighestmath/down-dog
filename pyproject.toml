@@ -4,7 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.14"
 
 [tool.pytest.ini_options]
-# Добавляет корень проекта в sys.path, чтобы импорт "app" работал
+# Добавляет корень проекта в sys.path, чтобы импорт "backend" работал
 # и при запуске консольной командой "pytest" (не только "python -m pytest")
 pythonpath = ["."]
 

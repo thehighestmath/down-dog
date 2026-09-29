@@ -2,12 +2,12 @@ import os
 
 import boto3
 from botocore.client import Config
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
 
 def create_s3_client():
     load_dotenv()
-    # Создаем клиент
     s3 = boto3.client(
         "s3",
         endpoint_url=os.getenv("MINIO_ENDPOINT"),
@@ -17,22 +17,43 @@ def create_s3_client():
         region_name="us-east-1",
     )
 
+    bucket = os.getenv("BUCKET_NAME")
     try:
-        s3.create_bucket(Bucket=os.getenv("BUCKET_NAME"))
-        print(f'✅ Бакет "{os.getenv("BUCKET_NAME")}" создан')
-    except Exception as error:
-        print(f"ℹ️ Бакет уже существует или ошибка: {error}")
+        s3.head_bucket(Bucket=bucket)
+        print(f'ℹ️ Бакет "{bucket}" уже существует')
+    except ClientError:
+        try:
+            s3.create_bucket(Bucket=bucket)
+            print(f'✅ Бакет "{bucket}" создан')
+        except Exception as error:
+            print(f"❌ Ошибка создания бакета: {error}")
+
     return s3
 
 
+def _mime_for(filename: str) -> str:
+    ext = filename.lower().rsplit(".", 1)[-1]
+    return {
+        "svg": "image/svg+xml",
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+    }.get(ext, "application/octet-stream")
+
+
 def create_image(s3):
-    # 2. Загружаем изображения
-    images_folder = "./Картинки с позами/"  # папка с картинками
+    bucket = os.getenv("BUCKET_NAME")
+    images_folder = "./Images/"
     for filename in os.listdir(images_folder):
         if filename.lower().endswith((".svg", ".png", ".jpg", ".jpeg")):
             file_path = os.path.join(images_folder, filename)
             try:
-                s3.upload_file(file_path, os.getenv("BUCKET_NAME"), filename)
+                s3.upload_file(
+                    file_path,
+                    bucket,
+                    filename,
+                    ExtraArgs={"ContentType": _mime_for(filename)},
+                )
                 print(f"✅ Загружено: {filename}")
             except Exception as e:
                 print(f"❌ Ошибка загрузки {filename}: {e}")

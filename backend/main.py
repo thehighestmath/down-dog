@@ -3,13 +3,22 @@ import uuid
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
-
-from app.generator import get_poses_by_focus, tren
 
 app = FastAPI()
 
-# Получаем папку, в которой находится текущий скрипт (app)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # для разработки; в проде укажи свой домен
+    allow_credentials=False,  # "*" + credentials=True нельзя вместе
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Получаем папку, в которой находится текущий скрипт (backend)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Соединяем путь к папке с именем файла
 csv_path = os.path.join(BASE_DIR, "Pose_with_focus.csv")
