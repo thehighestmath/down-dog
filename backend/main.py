@@ -1,13 +1,40 @@
 import os
 import uuid
+from contextlib import asynccontextmanager
 
 import pandas as pd
+from database import get_db_connection
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
 
-app = FastAPI()
+
+def init_db():
+    
+    migration_path = os.path.join(BASE_DIR, "sql", "create_poses.sql")
+    
+    if os.path.exists(migration_path):
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cursor:
+                with open(migration_path, "r", encoding="utf-8") as f:
+                    cursor.execute(f.read())
+                conn.commit()
+            conn.close()
+            print("--- Миграции PostgreSQL успешно применены ---")
+        except Exception as e:
+            print(f"--- Ошибка при применении миграции: {e} ---")
+    else:
+        print(f"--- Файл миграции НЕ найден по пути: {migration_path} ---")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
