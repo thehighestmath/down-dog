@@ -57,16 +57,12 @@ services:
       - app-network
     restart: unless-stopped
 
-  #это короче крутая штука по моему, мне понрав
-  #локалхост 8080 заходишь
-  #server app-postgres username postgres password postgres bd app_db
-  #тут можно сразу в браузере смотреть, менять базу данных, удобно мб илюхе будет
   adminer:
     image: adminer:6.1.1
     container_name: app-adminer
     restart: always
     ports:
-      - "8080:8080"
+      - '8080:8080'
     depends_on:
       - db
     networks:
