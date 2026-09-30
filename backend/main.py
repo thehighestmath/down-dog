@@ -23,9 +23,7 @@ def init_db():
         logger.warning("Папка миграций НЕ найдена по пути: %s", sql_dir)
         return
 
-    sql_files = sorted(
-        [f for f in os.listdir(sql_dir) if f.endswith(".sql")]
-    )
+    sql_files = sorted([f for f in os.listdir(sql_dir) if f.endswith(".sql")])
 
     if not sql_files:
         logger.warning("В папке %s не найдено .sql файлов", sql_dir)
@@ -46,9 +44,7 @@ def init_db():
         logger.info("Все миграции PostgreSQL успешно применены!")
 
     except Exception as e:
-        logger.error(
-            "Ошибка при применении миграции: %s", e, exc_info=True
-        )
+        logger.error("Ошибка при применении миграции: %s", e, exc_info=True)
 
 
 @asynccontextmanager
