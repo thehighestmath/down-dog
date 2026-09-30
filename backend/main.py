@@ -17,22 +17,34 @@ logger = logging.getLogger("app")
 
 
 def init_db():
-    migration_path = os.path.join(BASE_DIR, "sql", "create_poses.sql")
+    sql_dir = os.path.join(BASE_DIR, "sql")
 
-    if os.path.exists(migration_path):
-        try:
-            conn = get_db_connection()
-            with conn.cursor() as cursor:
-                with open(migration_path, "r", encoding="utf-8") as f:
+    if not os.path.exists(sql_dir):
+        logger.warning("Папка миграций НЕ найдена по пути: %s", sql_dir)
+        return
+
+    sql_files = sorted([f for f in os.listdir(sql_dir) if f.endswith(".sql")])
+
+    if not sql_files:
+        logger.warning("В папке %s не найдено .sql файлов", sql_dir)
+        return
+
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            for file_name in sql_files:
+                file_path = os.path.join(sql_dir, file_name)
+                logger.info("Применение миграции: %s", file_name)
+
+                with open(file_path, "r", encoding="utf-8") as f:
                     cursor.execute(f.read())
-                conn.commit()
-            conn.close()
-            logger.info("Миграции PostgreSQL успешно применены")
 
-        except Exception as e:
-            logger.error("Ошибка при применении миграции: %s", e, exc_info=True)
-    else:
-        logger.warning("Файл миграции НЕ найден по пути: %s", migration_path)
+        conn.commit()
+        conn.close()
+        logger.info("Все миграции PostgreSQL успешно применены!")
+
+    except Exception as e:
+        logger.error("Ошибка при применении миграции: %s", e, exc_info=True)
 
 
 @asynccontextmanager
