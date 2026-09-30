@@ -11,10 +11,10 @@ from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("app")
+
 
 def init_db():
     migration_path = os.path.join(BASE_DIR, "sql", "create_poses.sql")
@@ -33,6 +33,7 @@ def init_db():
             logger.error("Ошибка при применении миграции: %s", e, exc_info=True)
     else:
         logger.warning("Файл миграции НЕ найден по пути: %s", migration_path)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
