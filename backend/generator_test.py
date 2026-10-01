@@ -1,19 +1,30 @@
-import pandas as pd
-
 from backend.generator import tren
 
 
 def test_tren_beginner_generates_poses():
-    data = {
-        "Название": ["Поза Собака", "Поза Кошка", "Сложная Поза"],
-        "Сложность (1-4)": [1, 2, 4],
-        "Полный цикл, сек": [30, 30, 30],
-        "Фокус (группы мышц)": ["спина", "спина", "шея"],
-    }
-    df = pd.DataFrame(data)
+    poses = [
+        {
+            "name_en": "Dog Pose",
+            "difficulty": "1",
+            "full_cycle_sec": 30,
+            "focus_areas": "спина",
+        },
+        {
+            "name_en": "Cat Pose",
+            "difficulty": "2",
+            "full_cycle_sec": 30,
+            "focus_areas": "спина",
+        },
+        {
+            "name_en": "Hard Pose",
+            "difficulty": "4",
+            "full_cycle_sec": 30,
+            "focus_areas": "шея",
+        },
+    ]
 
-    result = tren(df, level="beginner", duration=60, focus="back")
+    result = tren(poses, level="beginner", duration=60, focus="back")
 
     assert isinstance(result, list)
     assert len(result) == 2
-    assert result[0] in ["Поза Собака", "Поза Кошка"]
+    assert result[0] in ["Dog Pose", "Cat Pose"]
