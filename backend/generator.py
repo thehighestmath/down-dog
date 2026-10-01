@@ -1,14 +1,13 @@
-from typing import List, Optional
-
-import pandas as pd
+import random
+from typing import Callable, List, Optional
 
 
 def get_poses_by_focus(
-    df: pd.DataFrame,
+    poses: List[dict],
     focus: Optional[str],
-) -> pd.DataFrame:
+) -> List[dict]:
     if focus is None or focus == "full_body":
-        return df
+        return poses
 
     focus_map = {
         "back": ["спина", "поясница", "верхняя часть спины"],
@@ -20,126 +19,100 @@ def get_poses_by_focus(
     search_words = focus_map.get(focus)
 
     if search_words is None:
-        return df
+        return poses
 
-    selected_rows = []
+    selected = []
 
-    for index, row in df.iterrows():
-        muscle_groups = str(row["Фокус (группы мышц)"]).lower()
+    for pose in poses:
+        muscle_groups = str(pose["focus_areas"]).lower()
 
         for word in search_words:
             if word.lower() in muscle_groups:
-                selected_rows.append(index)
+                selected.append(pose)
                 break
 
-    return df.loc[selected_rows]
+    return selected
 
 
-def time_realize_warm(
+def _fill_time(
     t_max: int,
-    poses: pd.DataFrame,
+    poses: List[dict],
+    difficulty_filter: Callable[[int], bool],
 ) -> List[str]:
+    """Заполняет время позами, используя все уникальные позы перед повторами."""
     result = []
 
-    while t_max > 0 and not poses.empty:
-        possible = poses[poses["Сложность (1-4)"] <= 2]
+    candidates = [
+        p
+        for p in poses
+        if p.get("full_cycle_sec") is not None
+        and difficulty_filter(int(p["difficulty"]))
+    ]
 
-        if possible.empty:
-            break
+    if not candidates:
+        return result
 
-        pose = possible.sample().iloc[0]
+    pool = []
+    last_name = None
 
-        name = pose["Название"]
-        value = pose["Полный цикл, сек"]
+    while t_max > 0:
+        if not pool:
+            pool = list(candidates)
+            random.shuffle(pool)
+            if last_name and len(pool) > 1 and pool[0]["name_en"] == last_name:
+                pool.append(pool.pop(0))
+
+        pose = pool.pop(0)
+        name = pose["name_en"]
+        value = pose["full_cycle_sec"]
 
         if value <= t_max:
             result.append(name)
             t_max -= value
+            last_name = name
         else:
-            break
-
-    return result
-
-
-def time_realize_mid(
-    t_max: int,
-    poses: pd.DataFrame,
-) -> List[str]:
-    result = []
-
-    while t_max > 0 and not poses.empty:
-        possible = poses[poses["Сложность (1-4)"] == 3]
-
-        if possible.empty:
-            break
-
-        pose = possible.sample().iloc[0]
-
-        name = pose["Название"]
-        value = pose["Полный цикл, сек"]
-
-        if value <= t_max:
-            result.append(name)
-            t_max -= value
-        else:
-            break
-
-    return result
-
-
-def time_realize_hard(
-    t_max: int,
-    poses: pd.DataFrame,
-) -> List[str]:
-    result = []
-
-    while t_max > 0 and not poses.empty:
-        possible = poses[poses["Сложность (1-4)"] >= 4]
-
-        if possible.empty:
-            break
-
-        pose = possible.sample().iloc[0]
-
-        name = pose["Название"]
-        value = pose["Полный цикл, сек"]
-
-        if value <= t_max:
-            result.append(name)
-            t_max -= value
-        else:
-            break
+            found = False
+            for i, p in enumerate(pool):
+                if p["full_cycle_sec"] <= t_max:
+                    result.append(p["name_en"])
+                    t_max -= p["full_cycle_sec"]
+                    last_name = p["name_en"]
+                    pool.pop(i)
+                    found = True
+                    break
+            if not found:
+                break
 
     return result
 
 
 def tren(
-    df: pd.DataFrame,
+    poses: List[dict],
     level: str,
     duration: int,
     focus: Optional[str] = None,
 ) -> List[str]:
-    poses = get_poses_by_focus(df, focus)
-    if poses.empty:
+    filtered = get_poses_by_focus(poses, focus)
+    if not filtered:
         return []
 
     plans = {
         "beginner": [
-            (time_realize_warm, 1, 1),
+            (lambda d: d <= 2, 1, 1),
         ],
         "intermediate": [
-            (time_realize_warm, 1, 3),
-            (time_realize_mid, 2, 3),
+            (lambda d: d <= 2, 1, 3),
+            (lambda d: d == 3, 2, 3),
         ],
         "advanced": [
-            (time_realize_hard, 1, 5),
-            (time_realize_mid, 3, 5),
-            (time_realize_hard, 1, 5),
+            (lambda d: d >= 4, 1, 5),
+            (lambda d: d == 3, 3, 5),
+            (lambda d: d >= 4, 1, 5),
         ],
     }
 
     result = []
-    for func, num, den in plans.get(level, []):
-        result.extend(func(duration * num // den, poses))
+    for diff_filter, num, den in plans.get(level, []):
+        result.extend(_fill_time(duration * num // den, filtered, diff_filter))
 
     return result
