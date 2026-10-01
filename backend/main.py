@@ -1,13 +1,59 @@
+import logging
 import os
 import uuid
+from contextlib import asynccontextmanager
 
 import pandas as pd
+from database import get_db_connection
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
 
-app = FastAPI()
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("app")
+
+
+def init_db():
+    sql_dir = os.path.join(BASE_DIR, "sql")
+
+    if not os.path.exists(sql_dir):
+        logger.warning("Папка миграций НЕ найдена по пути: %s", sql_dir)
+        return
+
+    sql_files = sorted([f for f in os.listdir(sql_dir) if f.endswith(".sql")])
+
+    if not sql_files:
+        logger.warning("В папке %s не найдено .sql файлов", sql_dir)
+        return
+
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            for file_name in sql_files:
+                file_path = os.path.join(sql_dir, file_name)
+                logger.info("Применение миграции: %s", file_name)
+
+                with open(file_path, "r", encoding="utf-8") as f:
+                    cursor.execute(f.read())
+
+        conn.commit()
+        conn.close()
+        logger.info("Все миграции PostgreSQL успешно применены!")
+
+    except Exception as e:
+        logger.error("Ошибка при применении миграции: %s", e, exc_info=True)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

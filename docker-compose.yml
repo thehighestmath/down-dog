@@ -10,8 +10,17 @@ services:
       - ACCESS_KEY=minioadmin
       - SECRET_KEY=minioadmin
       - BUCKET_NAME=down-dog
+
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=app_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/app_db
     depends_on:
       minio:
+        condition: service_healthy
+      db:
         condition: service_healthy
     networks:
       - app-network
@@ -27,6 +36,37 @@ services:
     networks:
       - app-network
     restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: app-postgres
+    environment:
+      POSTGRES_DB: app_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d app_db']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  adminer:
+    image: adminer:6.1.1
+    container_name: app-adminer
+    restart: always
+    ports:
+      - '8080:8080'
+    depends_on:
+      - db
+    networks:
+      - app-network
 
   minio:
     image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
@@ -68,6 +108,7 @@ services:
 
 volumes:
   minio_data:
+  postgres_data:
 
 networks:
   app-network:
