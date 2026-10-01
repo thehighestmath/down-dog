@@ -1,4 +1,3 @@
---это первая миграция, создает таблицу с заданными столбцами
 CREATE TABLE IF NOT EXISTS poses (
     id SERIAL PRIMARY KEY,
     name_ru VARCHAR(255) NOT NULL,
