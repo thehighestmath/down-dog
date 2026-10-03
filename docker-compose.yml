@@ -92,7 +92,7 @@ services:
   s3:
     build:
       context: .
-      dockerfile: Dockerfile.s3.txt
+      dockerfile: s3/Dockerfile
     container_name: down-dog-s3
     environment:
       - MINIO_ENDPOINT=http://minio:9000
