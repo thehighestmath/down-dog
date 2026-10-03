@@ -2,12 +2,19 @@ import { useState, useEffect, type FormEvent } from 'react'
 import './App.css'
 
 interface Pose {
-  Название: string
-  Категория: string
-  'Сложность (1-4)': number
-  'Фокус (группы мышц)': string
-  'Полный цикл, сек': number
-  [key: string]: unknown
+  id: number
+  name_ru: string
+  name_sanskrit: string | null
+  name_en: string
+  category: string
+  difficulty: string
+  focus_areas: string
+  contraindications: string | null
+  description: string | null
+  image_url: string | null
+  audio_url: string | null
+  hold_time_sec: number | null
+  full_cycle_sec: number | null
 }
 
 interface Workout {
@@ -170,9 +177,9 @@ function App() {
             overflowY: 'auto',
           }}
         >
-          {poses.map((pose, idx) => (
+          {poses.map((pose) => (
             <div
-              key={idx}
+              key={pose.id}
               style={{
                 padding: '10px',
                 border: '1px solid #ddd',
@@ -180,10 +187,12 @@ function App() {
                 background: 'white',
               }}
             >
-              <strong>{pose['Название']}</strong>
+              <strong>{pose.name_en}</strong>
+              {pose.name_ru && (
+                <div style={{ fontSize: '11px', color: '#888' }}>{pose.name_ru}</div>
+              )}
               <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-                Сложность: {pose['Сложность (1-4)']} | Время: {pose['Полный цикл, сек']}{' '}
-                сек
+                Сложность: {pose.difficulty} | Время: {pose.full_cycle_sec ?? '—'} сек
               </div>
             </div>
           ))}
