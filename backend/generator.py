@@ -1,11 +1,9 @@
-from typing import List, Optional
-
 import pandas as pd
 
 
 def get_poses_by_focus(
     df: pd.DataFrame,
-    focus: Optional[str],
+    focus: str | None,
 ) -> pd.DataFrame:
     if focus is None or focus == "full_body":
         return df
@@ -38,7 +36,7 @@ def get_poses_by_focus(
 def time_realize_warm(
     t_max: int,
     poses: pd.DataFrame,
-) -> List[str]:
+) -> list[str]:
     result = []
 
     while t_max > 0 and not poses.empty:
@@ -64,7 +62,7 @@ def time_realize_warm(
 def time_realize_mid(
     t_max: int,
     poses: pd.DataFrame,
-) -> List[str]:
+) -> list[str]:
     result = []
 
     while t_max > 0 and not poses.empty:
@@ -90,7 +88,7 @@ def time_realize_mid(
 def time_realize_hard(
     t_max: int,
     poses: pd.DataFrame,
-) -> List[str]:
+) -> list[str]:
     result = []
 
     while t_max > 0 and not poses.empty:
@@ -117,8 +115,8 @@ def tren(
     df: pd.DataFrame,
     level: str,
     duration: int,
-    focus: Optional[str] = None,
-) -> List[str]:
+    focus: str | None = None,
+) -> list[str]:
     poses = get_poses_by_focus(df, focus)
     if poses.empty:
         return []
