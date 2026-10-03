@@ -14,6 +14,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("app")
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 def init_db():
     sql_dir = os.path.join(BASE_DIR, "sql")
@@ -62,9 +64,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# Получаем папку, в которой находится текущий скрипт (backend)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # -----------------------------------------
 # Временное хранилище тренировок
