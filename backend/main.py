@@ -3,7 +3,6 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 
-import pandas as pd
 from database import get_db_connection
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +13,8 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger("app")
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def init_db():
@@ -64,19 +65,33 @@ app.add_middleware(
 )
 
 
-# Получаем папку, в которой находится текущий скрипт (backend)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Соединяем путь к папке с именем файла
-csv_path = os.path.join(BASE_DIR, "Pose_with_focus.csv")
-
-# Передаем полный путь в pandas
-df = pd.read_csv(csv_path)
-
 # -----------------------------------------
 # Временное хранилище тренировок
 # -----------------------------------------
 
 workouts = {}
+
+
+# -----------------------------------------
+# Вспомогательная функция: загрузка поз из БД
+# -----------------------------------------
+
+
+def load_poses_from_db() -> list[dict]:
+    """Загружает все позы из таблицы poses в PostgreSQL."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, name_ru, name_sanskrit, name_en, category, "
+                "difficulty, focus_areas, contraindications, description, "
+                "image_url, audio_url, hold_time_sec, full_cycle_sec "
+                "FROM poses ORDER BY id"
+            )
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+    finally:
+        conn.close()
 
 
 # -----------------------------------------
@@ -99,21 +114,21 @@ class WorkoutRequest(BaseModel):
 def get_poses(
     category: str | None = None, difficulty: int | None = None, focus: str | None = None
 ):
-    result = df.copy()
+    poses = load_poses_from_db()
 
     # Фильтр по категории
     if category is not None:
-        result = result[result["Категория"] == category]
+        poses = [p for p in poses if p["category"] == category]
 
     # Фильтр по сложности
     if difficulty is not None:
-        result = result[result["Сложность (1-4)"] == difficulty]
+        poses = [p for p in poses if int(p["difficulty"]) == difficulty]
 
     # Фильтр по фокусу
     if focus is not None:
-        result = get_poses_by_focus(result, focus)
+        poses = get_poses_by_focus(poses, focus)
 
-    return result.to_dict(orient="records")
+    return poses
 
 
 # =========================================
@@ -156,11 +171,13 @@ def generate_workout(request: WorkoutRequest):
         raise HTTPException(status_code=400, detail="Неизвестный focus")
 
     # -------------------------------------
-    # Генерируем тренировку
+    # Загружаем позы из БД и генерируем тренировку
     # -------------------------------------
 
+    poses = load_poses_from_db()
+
     workout_poses = tren(
-        df=df,
+        poses=poses,
         level=request.level,
         duration=request.duration_min * 60,
         focus=request.focus,
