@@ -15,6 +15,34 @@ target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
-# Правила: E/Pyflakes-ошибки, F/имя-не-используется и пр., W/предупреждения,
-# I/порядок импортов, B/часто встречающиеся баги (bugbear)
-select = ["E", "F", "W", "I", "B"]
+# Описание каждого правила: https://docs.astral.sh/ruff/rules/
+select = [
+  "E", "W",  # pycodestyle: стиль
+  "F",       # pyflakes: неиспользуемые импорты/переменные, опечатки в именах
+  "I",       # isort: порядок импортов
+  "B",       # bugbear: частые баги (мутабельные дефолты и т.п.)
+  "UP",      # pyupgrade: современный синтаксис (list[str], X | None)
+  "SIM",     # упрощение кода
+  "C4",      # comprehensions
+  "C90",     # цикломатическая сложность функций
+  "N",       # pep8-naming
+  "S",       # bandit: безопасность (SQL-инъекции, хардкод секретов, eval)
+  "T20",     # print() вместо logging
+  "RUF",     # правила самого ruff
+  "FAST",    # FastAPI
+]
+ignore = [
+  # Ругаются на кириллицу, похожую на латиницу — в русскоязычном проекте бесполезны
+  "RUF001", "RUF002", "RUF003",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+# assert в тестах — норма
+"**/*_test.py" = ["S101"]
+"**/test_*.py" = ["S101"]
+# CLI-скрипты пишут в консоль
+"s3.py" = ["T201"]
+"scripts/**" = ["T201"]

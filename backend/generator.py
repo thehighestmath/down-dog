@@ -1,11 +1,11 @@
 import random
-from typing import Callable, List, Optional
+from collections.abc import Callable
 
 
 def get_poses_by_focus(
-    poses: List[dict],
-    focus: Optional[str],
-) -> List[dict]:
+    poses: list[dict],
+    focus: str | None,
+) -> list[dict]:
     if focus is None or focus == "full_body":
         return poses
 
@@ -36,9 +36,9 @@ def get_poses_by_focus(
 
 def _fill_time(
     t_max: int,
-    poses: List[dict],
+    poses: list[dict],
     difficulty_filter: Callable[[int], bool],
-) -> List[str]:
+) -> list[str]:
     """Заполняет время позами, используя все уникальные позы перед повторами."""
     result = []
 
@@ -87,11 +87,11 @@ def _fill_time(
 
 
 def tren(
-    poses: List[dict],
+    poses: list[dict],
     level: str,
     duration: int,
-    focus: Optional[str] = None,
-) -> List[str]:
+    focus: str | None = None,
+) -> list[str]:
     filtered = get_poses_by_focus(poses, focus)
     if not filtered:
         return []
