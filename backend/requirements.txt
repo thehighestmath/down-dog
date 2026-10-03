@@ -1,4 +1,4 @@
-boto3 == 1.43.105
+boto3 == 1.43.106
 python-dotenv == 1.2.3
 fastapi == 0.142.2
 pytest == 9.1.1
