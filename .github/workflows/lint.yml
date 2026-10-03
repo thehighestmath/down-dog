@@ -7,8 +7,8 @@ on:
   pull_request:
 
 jobs:
-  python:
-    name: Python (Ruff)
+  pre-commit:
+    name: pre-commit (ruff, eslint, prettier, hadolint, ...)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,38 +18,28 @@ jobs:
         with:
           python-version: '3.14'
 
-      - name: Install Ruff
-        run: pip install ruff
-
-      - name: Lint
-        run: ruff check .
-
-      - name: Format check
-        run: ruff format --check .
-
-  frontend:
-    name: JS/TS/HTML (ESLint + Prettier)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
 
-      - name: Install dependencies
+      # eslint hook runs from the root node_modules
+      - name: Install Node dependencies
         run: npm ci
 
-      - name: ESLint
-        run: npx eslint .
+      - name: Cache pre-commit environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
 
-      - name: Prettier check
-        run: |
-          files=$(find . -type f \( -name '*.js' -o -name '*.ts' -o -name '*.tsx' -o -name '*.html' -o -name '*.css' -o -name '*.scss' \) \
-            -not -path './node_modules/*' -not -path './.git/*')
-          if [ -n "$files" ]; then
-            npx prettier --check $files
-          else
-            echo "No JS/TS/HTML/CSS files to check"
-          fi
+      - name: Install pre-commit
+        run: pip install pre-commit
+
+      # Same hooks as locally, so "works on my machine" == "works in CI".
+      # no-commit-to-branch is for local use only: in CI we are always on a commit.
+      - name: Run hooks
+        env:
+          SKIP: no-commit-to-branch
+        run: pre-commit run --all-files --show-diff-on-failure --color=always

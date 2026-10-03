@@ -1,6 +1,71 @@
+# Keep this file ASCII-only: on Windows pre-commit reads it with the
+# system codepage and crashes on Cyrillic.
+#
+# Setup (once after cloning):
+#   pip install pre-commit
+#   npm install          # in the repo root, for the eslint hook
+#   pre-commit install
+# Run every hook on the whole repo:
+#   pre-commit run --all-files
+
+# Without this `pre-commit install` only installs the pre-commit stage,
+# and the commit message check silently never runs.
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+        # tsconfig*.json is JSON with comments
+        exclude: tsconfig.*\.json$
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        name: no direct commits to master (use a branch + PR)
+        args: [--branch, master]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.10
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/AleksaC/hadolint-py
+    rev: v2.15.1
+    hooks:
+      - id: hadolint
+        files: (^|/)Dockerfile[^/]*$
+
   - repo: local
     hooks:
+      - id: prettier
+        name: prettier
+        entry: prettier --write --ignore-unknown
+        language: node
+        types_or: [javascript, ts, tsx, css, html, json, yaml]
+        exclude: (package-lock\.json|tsconfig.*\.json)$
+        additional_dependencies: ['prettier@3.9.9']
+
+      # eslint.config.mjs imports plugins via ESM, which can only resolve them
+      # from ./node_modules -- so this hook needs `npm install` in the repo root.
+      - id: eslint
+        name: eslint
+        entry: npx --no-install eslint --max-warnings=0
+        language: system
+        types_or: [javascript, ts, tsx]
+
       - id: conventional-commit-msg
         name: conventional commit message
         description: Enforce Conventional Commits format on commit messages

@@ -1,0 +1,35 @@
+version: 2
+
+# Once a week, one grouped PR per ecosystem — to avoid flooding the repo.
+updates:
+  - package-ecosystem: pip
+    directories: ['/', '/backend']
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directories: ['/', '/frontend']
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ['*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directories: ['/backend', '/frontend']
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ['*']
