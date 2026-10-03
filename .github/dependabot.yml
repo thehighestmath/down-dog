@@ -3,7 +3,7 @@ version: 2
 # Once a week, one grouped PR per ecosystem — to avoid flooding the repo.
 updates:
   - package-ecosystem: pip
-    directories: ['/', '/backend']
+    directories: ['/backend', '/s3']
     schedule:
       interval: weekly
     groups:
@@ -27,7 +27,7 @@ updates:
         patterns: ['*']
 
   - package-ecosystem: docker
-    directories: ['/backend', '/frontend']
+    directories: ['/backend', '/frontend', '/s3']
     schedule:
       interval: weekly
     groups:

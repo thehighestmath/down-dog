@@ -2,13 +2,14 @@ FROM python:3.12-slim
 
 WORKDIR /down-dog
 
+# Build context is the repo root (see docker-compose.yml): Images/ lives there
+COPY s3/requirements.txt .
 RUN pip install --no-cache-dir \
     --index-url https://pypi.tuna.tsinghua.edu.cn/simple \
     --trusted-host pypi.tuna.tsinghua.edu.cn \
-    "boto3==1.35.36" \
-    "python-dotenv==1.0.1"
+    -r requirements.txt
 
-COPY s3.py .
-COPY "./Images" "./Images"
+COPY s3/s3.py .
+COPY Images ./Images
 
 CMD ["python", "s3.py"]

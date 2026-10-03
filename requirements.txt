@@ -1,8 +1,0 @@
-boto3 == 1.43.105
-python-dotenv == 1.2.3
-pandas == 3.0.6
-fastapi == 0.142.2
-pytest == 9.1.1
-httpcore == 1.0.9
-httpx == 0.28.1
-pydantic == 2.13.5

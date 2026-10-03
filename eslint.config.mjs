@@ -20,6 +20,13 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
 
+  // Monorepo (root + frontend/): typescript-eslint can't guess the root by itself
+  {
+    languageOptions: {
+      parserOptions: { tsconfigRootDir: import.meta.dirname },
+    },
+  },
+
   {
     files: ['frontend/**/*.{ts,tsx}'],
     languageOptions: {

@@ -233,7 +233,7 @@ down-dog/
 │   └── main.py
 │
 ├── .venv/
-├── requirements.txt
+├── backend/requirements.txt
 ├── .gitignore
 ├── .env
 ├── .env.example
@@ -325,13 +325,15 @@ GET  /api/workouts/{id}
 
 ## 7. Сохранение зависимостей
 
-После установки библиотек создайте или обновите `requirements.txt`:
+Зависимости хранятся рядом с кодом, который их использует:
 
-```bash
-pip freeze > requirements.txt
-```
+- `backend/requirements.txt` — API (ставится в Docker-образ backend и в CI для тестов);
+- `s3/requirements.txt` — загрузчик картинок в MinIO.
 
-В `requirements.txt` должны присутствовать установленные зависимости, включая:
+Добавив библиотеку, впишите её в нужный файл с версией (узнать версию: `pip show <пакет>`).
+Не используйте `pip freeze >` — он выгрузит всё окружение, включая лишние пакеты.
+
+В `backend/requirements.txt` должны присутствовать, в том числе:
 
 ```text
 fastapi
@@ -446,7 +448,7 @@ Ctrl + C
 1. Проверить `/`.
 2. Проверить `/docs`.
 3. Проверить существующие endpoint.
-4. Обновить `requirements.txt`.
+4. Обновить `backend/requirements.txt`.
 5. Реализовать `GET /api/poses`.
 6. Добавить фильтры `category`, `difficulty` и `focus`.
 7. Реализовать rule-based генератор тренировок.
