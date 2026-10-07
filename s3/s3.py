@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 import os
+import sys
 from typing import TYPE_CHECKING
 
 import boto3
@@ -34,6 +33,9 @@ def create_s3_client() -> S3Client:
             print(f'✅ Бакет "{bucket}" создан')
         except Exception as error:
             print(f"❌ Ошибка создания бакета: {error}")
+            # без бакета загружать некуда: ненулевой код выхода, чтобы
+            # docker compose и CI увидели сбой
+            sys.exit(1)
 
     return s3
 
@@ -48,7 +50,9 @@ def _mime_for(filename: str) -> str:
     }.get(ext, "application/octet-stream")
 
 
-def create_image(s3: S3Client) -> None:
+def create_image(s3: S3Client) -> int:
+    """Загружает картинки в бакет, возвращает число неудачных загрузок."""
+    failed = 0
     bucket = os.environ["BUCKET_NAME"]
     images_folder = "./Images/"
     for filename in os.listdir(images_folder):
@@ -64,13 +68,19 @@ def create_image(s3: S3Client) -> None:
                 print(f"✅ Загружено: {filename}")
             except Exception as e:
                 print(f"❌ Ошибка загрузки {filename}: {e}")
+                failed += 1
 
-    print("🎉 Готово!")
+    if failed:
+        print(f"⚠️ Не загружено файлов: {failed}")
+    else:
+        print("🎉 Готово!")
+    return failed
 
 
 def main() -> None:
     s3 = create_s3_client()
-    create_image(s3)
+    if create_image(s3):
+        sys.exit(1)
 
 
 if __name__ == "__main__":
