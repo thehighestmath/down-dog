@@ -35,12 +35,60 @@ repos:
         name: no direct commits to master (use a branch + PR)
         args: [--branch, master]
 
+  # Semantic YAML checks (check-yaml above only checks that it parses).
+  # Config: .yamllint
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: [--strict]
+
+  # GitHub Actions: expressions, inputs, shellcheck for run: blocks
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  # GitHub Actions security: script injection, token permissions, etc.
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.30.1
+    hooks:
+      - id: zizmor
+
+  # Secrets (passwords, tokens) in staged changes. This hook only looks at
+  # what is staged, so CI scans the full git history in security.yml.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # Shell scripts (scripts/*.sh): unquoted variables, typos, portability
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1-1
+    hooks:
+      - id: shellcheck
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.16.10
     hooks:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
+
+  # Type checking for Python. Config: [tool.mypy] in pyproject.toml.
+  # The hook runs in its own venv, so libraries with type hints/stubs that
+  # the code imports have to be listed here.
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.4.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - fastapi
+          - pydantic
+          - pytest
+          - python-dotenv
+          - types-psycopg2
+          - boto3-stubs[s3]
 
   - repo: https://github.com/AleksaC/hadolint-py
     rev: v2.15.1
