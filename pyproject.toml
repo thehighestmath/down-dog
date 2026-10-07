@@ -4,9 +4,10 @@ version = "0.1.0"
 requires-python = ">=3.14"
 
 [tool.pytest.ini_options]
-# Добавляет корень проекта в sys.path, чтобы импорт "backend" работал
-# и при запуске консольной командой "pytest" (не только "python -m pytest")
-pythonpath = ["."]
+# Добавляет backend/ в sys.path: тесты импортируют модули так же, как main.py
+# в контейнере ("from generator import ..."), иначе mypy видит один файл
+# под двумя именами модуля
+pythonpath = ["backend"]
 
 [tool.mypy]
 python_version = "3.14"
