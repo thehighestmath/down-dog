@@ -52,7 +52,9 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const API_URL = 'http://localhost:8000/api'
+  // Относительный адрес: в Docker /api/ проксирует nginx (nginx.conf),
+  // при npm run dev - Vite (server.proxy в vite.config.ts)
+  const API_URL = '/api'
 
   useEffect(() => {
     const fetchPoses = async () => {
