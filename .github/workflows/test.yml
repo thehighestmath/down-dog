@@ -24,7 +24,7 @@ jobs:
           python-version: '3.14'
 
       - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+        run: pip install -r backend/requirements-dev.txt
 
       - name: Run tests
         run: |
@@ -33,7 +33,7 @@ jobs:
           if ! pytest; then
             echo "::error title=pytest::Упали тесты, подробности в логе шага"
             echo "КАК ИСПРАВИТЬ: найди в логе FAILED и блок с assert - там ожидаемое"
-            echo "  и фактическое значение. Локально: pip install -r backend/requirements.txt"
+            echo "  и фактическое значение. Локально: pip install -r backend/requirements-dev.txt"
             echo "  && pytest -x -v. Если поведение поменяли намеренно - обнови тест."
             exit 1
           fi
