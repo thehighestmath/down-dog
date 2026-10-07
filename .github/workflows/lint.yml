@@ -26,7 +26,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '20'
+          node-version: '26'
           cache: npm
 
       # eslint hook runs from the root node_modules
@@ -144,19 +144,40 @@ jobs:
             exit 1
           fi
 
-      - name: Фронтенд (prettier, eslint)
+      - name: Форматирование (prettier) - TS, CSS, JSON, YAML, HTML
         if: ${{ !cancelled() }}
         run: |
-          echo "ЧТО: prettier - единый формат TS/CSS/JSON/YAML; eslint - ошибки в TS/React-коде."
-          echo "ЗАЧЕМ: eslint до запуска ловит баги хуков React, any, неиспользуемые переменные."
-          rc=0
-          for h in prettier eslint; do
-            pre-commit run "$h" --all-files --show-diff-on-failure --color=always || rc=1
-          done
-          if [ "$rc" -ne 0 ]; then
-            echo "::error title=prettier/eslint::Замечания к фронтенд-коду, подробности в логе шага"
-            echo "КАК ИСПРАВИТЬ: в корне репо: npm install, затем npx prettier --write ."
-            echo "  и npx eslint --fix . Остальное руками: https://eslint.org/docs/latest/rules"
+          echo "ЧТО: prettier - единый формат TS/CSS/HTML/JSON и YAML-файлов (compose, workflows)."
+          echo "ЗАЧЕМ: одинаковое форматирование у всех - в diff только смысловые изменения."
+          if ! pre-commit run prettier --all-files --show-diff-on-failure --color=always; then
+            echo "::error title=prettier::Файлы не отформатированы, diff в логе шага"
+            echo "КАК ИСПРАВИТЬ: pre-commit run prettier --all-files (или npx prettier --write .)"
+            echo "  и закоммить изменения. Правила форматирования - в .prettierrc.json."
+            exit 1
+          fi
+
+      - name: Фронтенд (eslint)
+        if: ${{ !cancelled() }}
+        run: |
+          echo "ЧТО: eslint - ошибки в TS/React-коде."
+          echo "ЗАЧЕМ: до запуска ловит баги хуков React, any, неиспользуемые переменные."
+          if ! pre-commit run eslint --all-files --color=always; then
+            echo "::error title=eslint::Замечания eslint к фронтенд-коду, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: в корне репо: npm install && npx eslint --fix ."
+            echo "  Остальное руками, правило ищи по имени: https://eslint.org/docs/latest/rules"
+            exit 1
+          fi
+
+      - name: Shell-скрипты (shellcheck)
+        if: ${{ !cancelled() }}
+        run: |
+          echo "ЧТО: shellcheck - ошибки в shell-скриптах (scripts/*.sh)."
+          echo "ЗАЧЕМ: переменная без кавычек или опечатка в bash ломается молча"
+          echo "       и только на определённых входных данных."
+          if ! pre-commit run shellcheck --all-files --color=always; then
+            echo "::error title=shellcheck::Ошибки в shell-скриптах, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: у замечания есть код SCxxxx, описание и пример исправления:"
+            echo "  https://www.shellcheck.net/wiki/SC2086 (подставь свой код)"
             exit 1
           fi
 
@@ -171,7 +192,7 @@ jobs:
             no-commit-to-branch,gitleaks,trailing-whitespace,end-of-file-fixer,
             mixed-line-ending,check-yaml,check-toml,check-json,check-merge-conflict,
             check-case-conflict,check-added-large-files,detect-private-key,yamllint,
-            actionlint,zizmor,ruff-check,ruff-format,mypy,hadolint,prettier,eslint
+            actionlint,zizmor,ruff-check,ruff-format,mypy,hadolint,prettier,eslint,shellcheck
         run: |
           echo "ЧТО: хуки pre-commit, которым ещё не выделили отдельный шаг выше."
           if ! pre-commit run --all-files --show-diff-on-failure --color=always; then
