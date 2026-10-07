@@ -8,6 +8,22 @@ requires-python = ">=3.14"
 # и при запуске консольной командой "pytest" (не только "python -m pytest")
 pythonpath = ["."]
 
+[tool.mypy]
+python_version = "3.14"
+# Код бэкенда импортирует соседние модули напрямую ("from database import ..."),
+# как и при запуске в контейнере из backend/
+mypy_path = "backend"
+# Все функции должны быть с аннотациями типов, иначе mypy их не проверяет
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+warn_unreachable = true
+
 [tool.ruff]
 # Python-версия, под которую пишем код
 target-version = "py314"

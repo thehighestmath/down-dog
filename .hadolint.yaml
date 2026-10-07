@@ -1,0 +1,7 @@
+# hadolint config, https://github.com/hadolint/hadolint#configure
+# Fail on every finding, including style/info level.
+failure-threshold: info
+
+# Images may only come from Docker Hub
+trustedRegistries:
+  - docker.io

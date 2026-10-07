@@ -6,15 +6,40 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: docker compose build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Validate compose file
         run: docker compose config --quiet
 
       - name: Build images
         run: docker compose build
+
+      # Images that build are not necessarily images that start: bring the
+      # stack up and check that the backend and frontend actually answer.
+      - name: Start stack
+        run: docker compose up -d --wait backend frontend
+
+      - name: Smoke test
+        run: |
+          curl --fail --silent --show-error --retry 10 --retry-delay 3 \
+            --retry-all-errors http://localhost:8000/docs > /dev/null
+          curl --fail --silent --show-error --retry 10 --retry-delay 3 \
+            --retry-all-errors http://localhost:3000/ > /dev/null
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
