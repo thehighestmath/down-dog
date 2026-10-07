@@ -43,8 +43,139 @@ jobs:
         run: pip install pre-commit
 
       # Same hooks as locally, so "works on my machine" == "works in CI".
-      # no-commit-to-branch is for local use only: in CI we are always on a commit.
-      - name: Run hooks
+      # They run in groups so that every group explains (in Russian, for the
+      # students) what it checks, why, and how to fix it.
+      # `!cancelled()` = run every group even if an earlier one failed,
+      # so all problems are visible at once.
+      - name: Гигиена файлов
+        if: ${{ !cancelled() }}
+        run: |
+          echo "ЧТО: пробелы в конце строк, перевод строки в конце файла, LF вместо CRLF,"
+          echo "     валидность YAML/JSON/TOML, маркеры конфликтов, большие файлы,"
+          echo "     приватные ключи в репозитории."
+          echo "ЗАЧЕМ: мусорные изменения засоряют diff в ревью, CRLF ломает shell-скрипты"
+          echo "       в Docker, а ключ, попавший в git, считается скомпрометированным."
+          rc=0
+          for h in trailing-whitespace end-of-file-fixer mixed-line-ending check-yaml \
+            check-toml check-json check-merge-conflict check-case-conflict \
+            check-added-large-files detect-private-key; do
+            pre-commit run "$h" --all-files --show-diff-on-failure --color=always || rc=1
+          done
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=Гигиена файлов::Проблемы с форматом файлов, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: выполни pre-commit run --all-files локально - большую часть"
+            echo "  хуки исправят сами, останется закоммитить. Конфликты и ключи - убрать руками."
+            exit 1
+          fi
+
+      - name: YAML (yamllint)
+        if: ${{ !cancelled() }}
+        run: |
+          echo "ЧТО: yamllint - дубли ключей, отступы, yes/no/on/off вместо true/false."
+          echo "ЗАЧЕМ: YAML молча проглатывает такие ошибки: дубль ключа перезапишет первый,"
+          echo "       no станет false. Сломанный compose или workflow заметят только при запуске."
+          if ! pre-commit run yamllint --all-files --color=always; then
+            echo "::error title=yamllint::Ошибки в YAML-файлах, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: в логе указаны файл:строка и имя правила."
+            echo "  Локально: pre-commit run yamllint --all-files"
+            echo "  Правила: https://yamllint.readthedocs.io/en/stable/rules.html"
+            exit 1
+          fi
+
+      - name: GitHub Actions (actionlint, zizmor)
+        if: ${{ !cancelled() }}
+        run: |
+          echo "ЧТО: actionlint - ошибки в workflows (выражения, inputs, shell в run:);"
+          echo "     zizmor - безопасность workflows (инъекции, права токена, закрепление actions)."
+          echo "ЗАЧЕМ: сломанный workflow иначе заметишь, только когда CI молча не запустится,"
+          echo "       а небезопасный позволяет чужому PR украсть токен репозитория."
+          rc=0
+          for h in actionlint zizmor; do
+            pre-commit run "$h" --all-files --color=always || rc=1
+          done
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=GitHub Actions::Ошибки в .github/workflows, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: у каждого замечания в логе есть ссылка на документацию с примером."
+            echo "  Actions закрепляй по SHA с комментарием версии: uses: owner/action@<sha> # vX.Y.Z"
+            echo "  Данные из github.event не подставляй прямо в run:, передавай через env."
+            exit 1
+          fi
+
+      - name: Python - стиль и баги (ruff)
+        if: ${{ !cancelled() }}
+        run: |
+          echo "ЧТО: ruff check - неиспользуемые импорты, частые баги, SQL-инъекции, сложность;"
+          echo "     ruff format - единый формат кода."
+          echo "ЗАЧЕМ: ловит ошибки до запуска, а единый формат убирает споры о стиле в ревью."
+          rc=0
+          for h in ruff-check ruff-format; do
+            pre-commit run "$h" --all-files --show-diff-on-failure --color=always || rc=1
+          done
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=ruff::Замечания ruff в Python-коде, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: ruff check --fix . && ruff format . - исправит всё, что может."
+            echo "  Остальное руками, описание правила: https://docs.astral.sh/ruff/rules/"
+            exit 1
+          fi
+
+      - name: Python - типы (mypy)
+        if: ${{ !cancelled() }}
+        run: |
+          echo "ЧТО: mypy - проверка типов: аннотации у функций, None там, где его не ждут."
+          echo "ЗАЧЕМ: ошибки вида 'передали None вместо str' находятся без запуска кода,"
+          echo "       а аннотации служат документацией к функциям."
+          if ! pre-commit run mypy --all-files --color=always; then
+            echo "::error title=mypy::Ошибки типов в Python-коде, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: добавь аннотации (def f(x: int) -> str:), у значений из"
+            echo "  os.getenv обработай None. Локально: pre-commit run mypy --all-files"
+            echo "  'Source file found twice' - модуль импортируется двумя путями, оставь один."
+            exit 1
+          fi
+
+      - name: Dockerfile (hadolint)
+        if: ${{ !cancelled() }}
+        run: |
+          echo "ЧТО: hadolint - лучшие практики Dockerfile."
+          echo "ЗАЧЕМ: незакреплённые версии и лишние слои дают невоспроизводимые и тяжёлые образы."
+          if ! pre-commit run hadolint --all-files --color=always; then
+            echo "::error title=hadolint::Замечания к Dockerfile, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: у замечания есть код DLxxxx или SCxxxx, описание и пример:"
+            echo "  https://github.com/hadolint/hadolint/wiki/DL3008 (подставь свой код)"
+            exit 1
+          fi
+
+      - name: Фронтенд (prettier, eslint)
+        if: ${{ !cancelled() }}
+        run: |
+          echo "ЧТО: prettier - единый формат TS/CSS/JSON/YAML; eslint - ошибки в TS/React-коде."
+          echo "ЗАЧЕМ: eslint до запуска ловит баги хуков React, any, неиспользуемые переменные."
+          rc=0
+          for h in prettier eslint; do
+            pre-commit run "$h" --all-files --show-diff-on-failure --color=always || rc=1
+          done
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=prettier/eslint::Замечания к фронтенд-коду, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: в корне репо: npm install, затем npx prettier --write ."
+            echo "  и npx eslint --fix . Остальное руками: https://eslint.org/docs/latest/rules"
+            exit 1
+          fi
+
+      # Safety net: hooks added to .pre-commit-config.yaml later but not given
+      # their own group above still run here. Keep SKIP in sync with the groups.
+      # gitleaks only scans staged changes (CI scans history in security.yml);
+      # no-commit-to-branch is for local use only.
+      - name: Остальные хуки
+        if: ${{ !cancelled() }}
         env:
-          SKIP: no-commit-to-branch
-        run: pre-commit run --all-files --show-diff-on-failure --color=always
+          SKIP: >-
+            no-commit-to-branch,gitleaks,trailing-whitespace,end-of-file-fixer,
+            mixed-line-ending,check-yaml,check-toml,check-json,check-merge-conflict,
+            check-case-conflict,check-added-large-files,detect-private-key,yamllint,
+            actionlint,zizmor,ruff-check,ruff-format,mypy,hadolint,prettier,eslint
+        run: |
+          echo "ЧТО: хуки pre-commit, которым ещё не выделили отдельный шаг выше."
+          if ! pre-commit run --all-files --show-diff-on-failure --color=always; then
+            echo "::error title=pre-commit::Упал хук pre-commit, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: имя хука в логе. Локально: pre-commit run <хук> --all-files"
+            exit 1
+          fi

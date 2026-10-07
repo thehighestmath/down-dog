@@ -33,4 +33,13 @@ jobs:
 
       # "build" = tsc -b && vite build, so TypeScript errors fail the job
       - name: Build
-        run: npm run build
+        run: |
+          echo "ЧТО: проверка типов TypeScript (tsc -b) и сборка фронтенда (vite build)."
+          echo "ЗАЧЕМ: ошибка типов - это баг, найденный до запуска; а то, что не собирается,"
+          echo "       нельзя задеплоить."
+          if ! npm run build; then
+            echo "::error title=frontend build::Фронтенд не собирается, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: ошибки tsc выглядят как file.tsx(строка,колонка): error TSxxxx."
+            echo "  Локально: cd frontend && npm ci && npm run build"
+            exit 1
+          fi

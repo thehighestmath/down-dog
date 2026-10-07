@@ -22,10 +22,19 @@ jobs:
           persist-credentials: false
 
       - name: Scan
-        run: >-
-          docker run --rm -v "$PWD:/repo" -w /repo
-          ghcr.io/gitleaks/gitleaks:v8.30.1
-          git --redact --verbose /repo
+        run: |
+          echo "ЧТО: gitleaks - пароли, токены и ключи во всей истории git."
+          echo "ЗАЧЕМ: секрет, попавший в git, остаётся в истории даже после удаления файла,"
+          echo "       и его может достать любой, у кого есть доступ к репозиторию."
+          if ! docker run --rm -v "$PWD:/repo" -w /repo \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 git --redact --verbose /repo; then
+            echo "::error title=gitleaks::Найден секрет в истории git, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: 1) сразу смени (отзови) этот пароль/токен - он уже утёк;"
+            echo "  2) убери его из кода, читай из переменной окружения или .env (он в .gitignore);"
+            echo "  3) если это ложное срабатывание - добавь Fingerprint из лога в .gitleaksignore"
+            echo "     и согласуй с ментором."
+            exit 1
+          fi
 
   trivy-config:
     name: Dockerfile misconfigurations (trivy)
@@ -38,7 +47,14 @@ jobs:
       # Docker image instead of aquasecurity/trivy-action: the action's tags
       # were hijacked in a supply chain attack, a pinned image is safer.
       - name: Scan
-        run: >-
-          docker run --rm -v "$PWD:/repo" -w /repo
-          aquasec/trivy:0.75.0
-          config --exit-code 1 --severity HIGH,CRITICAL /repo
+        run: |
+          echo "ЧТО: trivy config - опасные настройки в Dockerfile (HIGH и CRITICAL)."
+          echo "ЗАЧЕМ: например, процесс от root в контейнере: при взломе приложения"
+          echo "       атакующий получает полные права внутри контейнера."
+          if ! docker run --rm -v "$PWD:/repo" -w /repo \
+            aquasec/trivy:0.75.0 config --exit-code 1 --severity HIGH,CRITICAL /repo; then
+            echo "::error title=trivy::Опасные настройки в Dockerfile, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: у замечания есть ID (например DS-0002) и ссылка с примером."
+            echo "  Root: создай пользователя (RUN useradd) и переключись на него (USER app)."
+            exit 1
+          fi

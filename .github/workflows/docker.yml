@@ -19,22 +19,57 @@ jobs:
           persist-credentials: false
 
       - name: Validate compose file
-        run: docker compose config --quiet
+        run: |
+          echo "ЧТО: docker compose config - валидность docker-compose.yml."
+          echo "ЗАЧЕМ: опечатка в compose ломает запуск всего проекта у всей команды."
+          if ! docker compose config --quiet; then
+            echo "::error title=docker compose config::docker-compose.yml невалиден"
+            echo "КАК ИСПРАВИТЬ: локально docker compose config покажет строку с ошибкой."
+            exit 1
+          fi
 
       - name: Build images
-        run: docker compose build
+        run: |
+          echo "ЧТО: сборка Docker-образов всех сервисов."
+          echo "ЗАЧЕМ: если образ не собирается в CI, он не соберётся и при деплое."
+          if ! docker compose build; then
+            echo "::error title=docker build::Образ не собирается, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: найди в логе шаг Dockerfile с ошибкой (=> ERROR [сервис N/M])."
+            echo "  Частые причины: файл не попал в build context или отфильтрован .dockerignore,"
+            echo "  нет пакета в requirements.txt/package.json. Локально: docker compose build"
+            exit 1
+          fi
 
       # Images that build are not necessarily images that start: bring the
       # stack up and check that the backend and frontend actually answer.
       - name: Start stack
-        run: docker compose up -d --wait backend frontend
+        run: |
+          echo "ЧТО: запуск backend, frontend и их зависимостей (БД, MinIO)."
+          echo "ЗАЧЕМ: собранный образ ещё не значит работающий - контейнер может упасть"
+          echo "       на старте из-за импорта, версии Python или конфигурации."
+          if ! docker compose up -d --wait backend frontend; then
+            echo "::error title=docker compose up::Сервисы не запустились, логи в шаге Logs on failure"
+            echo "КАК ИСПРАВИТЬ: открой шаг Logs on failure и найди Traceback/ошибку"
+            echo "  упавшего контейнера. Локально: docker compose up backend frontend"
+            exit 1
+          fi
 
       - name: Smoke test
         run: |
+          echo "ЧТО: смоук-тест - бэкенд отвечает на /docs, фронтенд отдаёт главную страницу."
+          echo "ЗАЧЕМ: минимальная проверка, что приложение реально работает после запуска."
+          rc=0
           curl --fail --silent --show-error --retry 10 --retry-delay 3 \
-            --retry-all-errors http://localhost:8000/docs > /dev/null
+            --retry-all-errors http://localhost:8000/docs > /dev/null || rc=1
           curl --fail --silent --show-error --retry 10 --retry-delay 3 \
-            --retry-all-errors http://localhost:3000/ > /dev/null
+            --retry-all-errors http://localhost:3000/ > /dev/null || rc=1
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=smoke test::Сервис не отвечает, логи в шаге Logs on failure"
+            echo "КАК ИСПРАВИТЬ: в логе curl видно, какой адрес не ответил (8000 - бэкенд,"
+            echo "  3000 - фронт). Причину ищи в шаге Logs on failure. Локально:"
+            echo "  docker compose up -d backend frontend && curl -f localhost:8000/docs"
+            exit 1
+          fi
 
       - name: Logs on failure
         if: failure()

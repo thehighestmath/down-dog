@@ -28,5 +28,16 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
+          echo "ЧТО: заголовок PR в формате Conventional Commits: тип(область): описание."
+          echo "ЗАЧЕМ: при squash merge заголовок PR становится сообщением коммита в master,"
+          echo "       по нему читают историю и собирают changelog."
           printf '%s\n' "$PR_TITLE" > "$RUNNER_TEMP/title.txt"
-          python scripts/check_commit_msg.py "$RUNNER_TEMP/title.txt"
+          if ! python scripts/check_commit_msg.py "$RUNNER_TEMP/title.txt"; then
+            echo "::error title=PR title::Заголовок PR не в формате Conventional Commits"
+            echo "КАК ИСПРАВИТЬ: нажми Edit рядом с заголовком PR и переименуй, например:"
+            echo "  feat: генерация тренировки по уровню"
+            echo "  fix(backend): 500 при пустом списке поз"
+            echo "  Типы: feat, fix, docs, style, refactor, test, build, ci, chore, perf."
+            echo "  Проверка перезапустится сама."
+            exit 1
+          fi

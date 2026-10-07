@@ -27,4 +27,13 @@ jobs:
         run: pip install -r backend/requirements.txt
 
       - name: Run tests
-        run: pytest
+        run: |
+          echo "ЧТО: pytest - автотесты Python (файлы *_test.py и test_*.py)."
+          echo "ЗАЧЕМ: тесты подтверждают, что изменение не сломало то, что уже работало."
+          if ! pytest; then
+            echo "::error title=pytest::Упали тесты, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: найди в логе FAILED и блок с assert - там ожидаемое"
+            echo "  и фактическое значение. Локально: pip install -r backend/requirements.txt"
+            echo "  && pytest -x -v. Если поведение поменяли намеренно - обнови тест."
+            exit 1
+          fi
