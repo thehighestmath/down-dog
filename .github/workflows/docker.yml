@@ -41,33 +41,34 @@ jobs:
           fi
 
       # Images that build are not necessarily images that start: bring the
-      # stack up and check that the backend and frontend actually answer.
+      # whole stack up and check that every service actually works.
+      # s3 is a one-shot job (uploads images and exits), the smoke test runs it.
       - name: Start stack
         run: |
-          echo "ЧТО: запуск backend, frontend и их зависимостей (БД, MinIO)."
+          echo "ЧТО: запуск всех сервисов из docker-compose.yml (кроме разового s3)."
           echo "ЗАЧЕМ: собранный образ ещё не значит работающий - контейнер может упасть"
           echo "       на старте из-за импорта, версии Python или конфигурации."
-          if ! docker compose up -d --wait backend frontend; then
+          mapfile -t services < <(docker compose config --services | grep -vx s3)
+          echo "Сервисы: ${services[*]}"
+          if ! docker compose up -d --wait --wait-timeout 180 "${services[@]}"; then
             echo "::error title=docker compose up::Сервисы не запустились, логи в шаге Logs on failure"
             echo "КАК ИСПРАВИТЬ: открой шаг Logs on failure и найди Traceback/ошибку"
-            echo "  упавшего контейнера. Локально: docker compose up backend frontend"
+            echo "  упавшего контейнера. Локально: docker compose up"
             exit 1
           fi
 
       - name: Smoke test
         run: |
-          echo "ЧТО: смоук-тест - бэкенд отвечает на /docs, фронтенд отдаёт главную страницу."
-          echo "ЗАЧЕМ: минимальная проверка, что приложение реально работает после запуска."
-          rc=0
-          curl --fail --silent --show-error --retry 10 --retry-delay 3 \
-            --retry-all-errors http://localhost:8000/docs > /dev/null || rc=1
-          curl --fail --silent --show-error --retry 10 --retry-delay 3 \
-            --retry-all-errors http://localhost:3000/ > /dev/null || rc=1
-          if [ "$rc" -ne 0 ]; then
-            echo "::error title=smoke test::Сервис не отвечает, логи в шаге Logs on failure"
-            echo "КАК ИСПРАВИТЬ: в логе curl видно, какой адрес не ответил (8000 - бэкенд,"
-            echo "  3000 - фронт). Причину ищи в шаге Logs on failure. Локально:"
-            echo "  docker compose up -d backend frontend && curl -f localhost:8000/docs"
+          echo "ЧТО: смоук-тест - каждый сервис отвечает и делает свою работу: API бэкенда"
+          echo "     (с БД), фронт и прокси /api/ через nginx, Postgres, MinIO, Adminer,"
+          echo "     загрузка картинок скриптом s3."
+          echo "ЗАЧЕМ: минимальная проверка, что приложение реально работает целиком,"
+          echo "       а не только собирается."
+          if ! bash scripts/smoke_test.sh; then
+            echo "::error title=smoke test::Смоук-тест не пройден, см. строки FAIL в логе шага"
+            echo "КАК ИСПРАВИТЬ: у каждой строки FAIL есть подсказка, какой сервис смотреть;"
+            echo "  логи контейнеров - в шаге Logs on failure. Локально:"
+            echo "  docker compose up -d --wait && bash scripts/smoke_test.sh"
             exit 1
           fi
 
