@@ -161,9 +161,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
             }}
           />
         ) : (
-          <div style={{ fontSize: '14px', opacity: 0.5 }}>
-            Изображение недоступно
-          </div>
+          <div style={{ fontSize: '14px', opacity: 0.5 }}>Изображение недоступно</div>
         )}
       </div>
 
