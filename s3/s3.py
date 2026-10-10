@@ -80,10 +80,6 @@ def create_image(s3: S3Client) -> int:
 
 
 def create_audio(s3: S3Client) -> int:
-    """Загружает озвучку в бакет с сохранением папок, возвращает число неудачных загрузок.
-
-    ./audio/poses_ru/eagle.mp3 -> audio/poses_ru/eagle.mp3 в бакете
-    """
     failed = 0
     bucket = os.environ["BUCKET_NAME"]
     audio_folder = Path("./audio")
