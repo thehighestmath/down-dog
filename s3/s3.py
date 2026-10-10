@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import boto3
@@ -47,6 +48,7 @@ def _mime_for(filename: str) -> str:
         "png": "image/png",
         "jpg": "image/jpeg",
         "jpeg": "image/jpeg",
+        "mp3": "audio/mpeg",
     }.get(ext, "application/octet-stream")
 
 
@@ -73,13 +75,43 @@ def create_image(s3: S3Client) -> int:
     if failed:
         print(f"⚠️ Не загружено файлов: {failed}")
     else:
-        print("🎉 Готово!")
+        print("🎉 Картинки готовы!")
+    return failed
+
+
+def create_audio(s3: S3Client) -> int:
+    """Загружает озвучку в бакет с сохранением папок, возвращает число неудачных загрузок.
+
+    ./audio/poses_ru/eagle.mp3 -> audio/poses_ru/eagle.mp3 в бакете
+    """
+    failed = 0
+    bucket = os.environ["BUCKET_NAME"]
+    audio_folder = Path("./audio")
+    for file_path in sorted(audio_folder.rglob("*.mp3")):
+        key = "audio/" + file_path.relative_to(audio_folder).as_posix()
+        try:
+            s3.upload_file(
+                str(file_path),
+                bucket,
+                key,
+                ExtraArgs={"ContentType": _mime_for(key)},
+            )
+            print(f"✅ Загружено: {key}")
+        except Exception as e:
+            print(f"❌ Ошибка загрузки {key}: {e}")
+            failed += 1
+
+    if failed:
+        print(f"⚠️ Не загружено аудиофайлов: {failed}")
+    else:
+        print("🎉 Озвучка готова!")
     return failed
 
 
 def main() -> None:
     s3 = create_s3_client()
-    if create_image(s3):
+    failed = create_image(s3) + create_audio(s3)
+    if failed:
         sys.exit(1)
 
 
