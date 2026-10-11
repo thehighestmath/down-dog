@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import uuid
@@ -103,6 +104,13 @@ class WorkoutRequest(BaseModel):
     duration_min: int
     level: str
     focus: str
+
+
+class AnalyticsEvent(BaseModel):
+    event_type: str
+    user_id: str
+    session_id: str
+    payload: dict | None = None
 
 
 # =========================================
@@ -219,3 +227,40 @@ def get_workout(workout_id: str):
         raise HTTPException(status_code=404, detail="Тренировка не найдена")
 
     return workout
+
+
+@app.post("/api/analytics/track")
+def track_event(event: AnalyticsEvent):
+
+    logger.info(f"Event: {json.dumps(event.dict())}")
+
+    allowed_types = (
+        "workout_started",
+        "workout_completed",
+        "workout_abandoned",
+        "pose_viewed",
+    )
+
+    if event.event_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Недопустимый event_type")
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO analytics_events (event_type, user_id, session_id, payload)
+                VALUES (%s, %s::uuid, %s::uuid, %s::jsonb)
+                """,
+                (
+                    event.event_type,
+                    event.user_id,
+                    event.session_id,
+                    json.dumps(event.payload or {}),
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"status": "ok"}
