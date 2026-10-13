@@ -30,11 +30,23 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     [playlist],
   )
 
+  // Смещения начала каждой позы: [0, 30, 65, ...]
+  const poseOffsets = useMemo(() => {
+    const offsets: number[] = []
+    let acc = 0
+    for (const item of playlist) {
+      offsets.push(acc)
+      acc += item.duration
+    }
+    return offsets
+  }, [playlist])
+
   const [elapsed, setElapsed] = useState(0)
   const [running, setRunning] = useState(true)
   const [confirmStop, setConfirmStop] = useState(false)
   const finishedRef = useRef(false)
 
+  // Тик таймера
   useEffect(() => {
     if (!running || totalSec === 0) return
     const id = window.setInterval(() => {
@@ -43,6 +55,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     return () => window.clearInterval(id)
   }, [running, totalSec])
 
+  // Завершение
   useEffect(() => {
     if (totalSec > 0 && elapsed >= totalSec && !finishedRef.current) {
       finishedRef.current = true
@@ -50,10 +63,10 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     }
   }, [elapsed, totalSec, onFinish])
 
+  // Текущая поза
   let acc = 0
   let currentIdx = 0
   let timeInPose = 0
-
   for (let i = 0; i < playlist.length; i++) {
     const d = playlist[i].duration
     if (elapsed < acc + d) {
@@ -72,11 +85,18 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0
   const progress = totalSec > 0 ? elapsed / totalSec : 0
 
+  // Пропустить текущую позу
+  const handleSkip = () => {
+    const nextStart = poseOffsets[currentIdx + 1] ?? totalSec
+    setElapsed(nextStart)
+  }
+
   if (!current) return null
 
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const ss = String(timeLeft % 60).padStart(2, '0')
   const nextPose = playlist[currentIdx + 1]?.pose
+  const isLastPose = currentIdx === playlist.length - 1
 
   const imgSrc = current.pose?.image_url
     ? current.pose.image_url.startsWith('http')
@@ -98,6 +118,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         margin: '0 auto',
       }}
     >
+      {/* Верхняя строка */}
       <div
         style={{
           display: 'flex',
@@ -108,9 +129,16 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         <div style={{ fontSize: '14px', opacity: 0.7 }}>
           Поза {currentIdx + 1} / {playlist.length}
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <button onClick={() => setRunning((r) => !r)} style={btnStyle('#444')}>
             {running ? '⏸ Пауза' : '▶ Продолжить'}
+          </button>
+          <button
+            onClick={handleSkip}
+            style={btnStyle('#ff9800')}
+            title={isLastPose ? 'Завершить тренировку' : 'Пропустить позу'}
+          >
+            {isLastPose ? '⏭ Завершить' : '⏭ Пропустить'}
           </button>
           <button onClick={() => setConfirmStop(true)} style={btnStyle('#c62828')}>
             ⏹ Стоп
@@ -118,6 +146,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         </div>
       </div>
 
+      {/* Прогресс тренировки */}
       <div
         style={{
           height: '6px',
@@ -132,11 +161,12 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
             height: '100%',
             width: `${progress * 100}%`,
             background: 'linear-gradient(90deg,#4caf50,#8bc34a)',
-            transition: 'width 0.9s linear',
+            transition: 'width 0.3s linear',
           }}
         />
       </div>
 
+      {/* Картинка позы */}
       <div
         style={{
           display: 'flex',
@@ -161,10 +191,13 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
             }}
           />
         ) : (
-          <div style={{ fontSize: '14px', opacity: 0.5 }}>Изображение недоступно</div>
+          <div style={{ fontSize: '14px', opacity: 0.5 }}>
+            Изображение недоступно
+          </div>
         )}
       </div>
 
+      {/* Названия */}
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '32px', fontWeight: 700, lineHeight: 1.2 }}>
           {current.pose?.name_ru || current.name}
@@ -176,6 +209,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         )}
       </div>
 
+      {/* Таймер */}
       <div
         style={{
           textAlign: 'center',
@@ -190,6 +224,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         {mm}:{ss}
       </div>
 
+      {/* Описание */}
       {current.pose?.description && (
         <div
           style={{
@@ -220,6 +255,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         </div>
       )}
 
+      {/* Подтверждение стопа */}
       {confirmStop && (
         <div
           style={{
