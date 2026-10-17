@@ -106,6 +106,18 @@ services:
       - app-network
     restart: 'no'
 
+  microservice:
+    build:
+      context: ./microservice
+    image: simple_microservice
+    container_name: simple_microservice
+    restart: unless-stopped
+    ports:
+      - '8001:8000'
+    command: gunicorn -b 0.0.0.0:8000 -k uvicorn.workers.UvicornWorker simple_microservice:api
+    networks:
+      - app-network
+
 volumes:
   minio_data:
   postgres_data:
