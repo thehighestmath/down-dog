@@ -1,55 +1,63 @@
 import asyncio
-import httpx
+import logging
 import time
+
+import httpx
 from fastapi import FastAPI
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 api = FastAPI()
 
 
 @api.get("/")
-def read_root():
+def read_root() -> dict[str, str]:
     return {"message": "Привет, брат! Микросервис работает!"}
 
 
-# И вот эту
 @api.get("/check")
-def check_service():
+def check_service() -> dict[str, str]:
     return {"status": "ok", "service": "microservice"}
 
 
-async def get_poses_api(category=None, difficulty=None, focus=None):
-    url = 'http://localhost:8000/api/poses'
+async def get_poses_api(
+    category: str | None = None,
+    difficulty: int | None = None,
+    focus: str | None = None,
+) -> None:
+    url = "http://backend:8000/api/poses"
 
-    # собираем параметры в словарь (httpx сам сделает ?category=...&difficulty=...)
-    params = {}
+    params: dict[str, str | int] = {}
     if category is not None:
-        params['category'] = category
+        params["category"] = category
     if difficulty is not None:
-        params['difficulty'] = difficulty
+        params["difficulty"] = difficulty
     if focus is not None:
-        params['focus'] = focus
+        params["focus"] = focus
 
-    for i in range(6):
+    for _ in range(6):
         async with httpx.AsyncClient() as client:
             response = await client.get(url, params=params)
             response.raise_for_status()
 
         data = response.json()
-        print('count: {}, params: {}'.format(len(data), params))
+        # Заменили print на logger.info
+        logger.info(f"count: {len(data)}, params: {params}")
 
 
-async def main():
+async def main() -> None:
     tasks = [
-        asyncio.ensure_future(get_poses_api(category='balancing')),
+        asyncio.ensure_future(get_poses_api(category="balancing")),
         asyncio.ensure_future(get_poses_api(difficulty=1)),
-        asyncio.ensure_future(get_poses_api(focus='back')),
+        asyncio.ensure_future(get_poses_api(focus="back")),
     ]
     await asyncio.gather(*tasks)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     start = time.time()
     asyncio.run(main())
     end = time.time() - start
-    print(f'time {end:0.2f} seconds')
-    print(f'mean time for 1 request: {end / 18:0.2f} seconds')
+    logger.info(f"time {end:0.2f} seconds")
+    logger.info(f"mean time for 1 request: {end / 18:0.2f} seconds")
