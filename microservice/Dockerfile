@@ -10,12 +10,11 @@ RUN python -m pip install --no-cache-dir -r requirements.txt
 
 COPY simple_microservice.py .
 
-# 1. Создаем группу и пользователя (с флагом -r для системного пользователя)
-# 2. Меняем владельца папки /app на нашего нового пользователя
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser && \
+# Создаем группу и пользователя с конкретными числовыми ID (1000)
+RUN groupadd -g 1000 appgroup && useradd -u 1000 -g appgroup -m appuser && \
     chown -R appuser:appgroup /app
 
-# 3. Переключаемся на этого пользователя (Trivy ищет именно эту строчку)
-USER appuser
+# Переключаемся на числовой ID (Hadolint это одобряет)
+USER 1000
 
 CMD ["gunicorn", "-b", "0.0.0.0:8000", "-k", "uvicorn.workers.UvicornWorker", "simple_microservice:api"]
