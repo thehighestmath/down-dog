@@ -1,6 +1,5 @@
 const API_URL = 'http://localhost:8000/api'
 
-
 function getUserId(): string {
   const key = 'analytics_user_id'
   let userId = localStorage.getItem(key)
@@ -13,13 +12,10 @@ function getUserId(): string {
   return userId
 }
 
-
 const sessionId: string = crypto.randomUUID()
-
 
 type AnalyticsEventType =
   'workout_started' | 'workout_completed' | 'workout_abandoned' | 'pose_viewed'
-
 
 export async function trackEvent(
   eventType: AnalyticsEventType,
@@ -47,7 +43,6 @@ export async function trackEvent(
     console.warn('[analytics] Не удалось отправить событие:', err)
   }
 }
-
 
 export function trackWorkoutStarted(
   workoutId: string,
