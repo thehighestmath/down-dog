@@ -1,8 +1,8 @@
-from backend.generator import get_poses_by_focus, tren
+from generator import get_poses_by_focus, tren
 
 # -- Фикстуры --
 
-SAMPLE_POSES = [
+SAMPLE_POSES: list[dict] = [
     {
         "name_en": "Mountain Pose",
         "difficulty": "1",
@@ -57,7 +57,7 @@ SAMPLE_POSES = [
 # -- Тесты --
 
 
-def test_beginner_generates_only_easy_poses():
+def test_beginner_generates_only_easy_poses() -> None:
     """Beginner уровень берёт только позы со сложностью <= 2."""
     result = tren(SAMPLE_POSES, level="beginner", duration=120, focus="full_body")
 
@@ -69,7 +69,7 @@ def test_beginner_generates_only_easy_poses():
         assert name in easy_names, f"{name} не должна быть в beginner"
 
 
-def test_no_repeats_until_pool_exhausted():
+def test_no_repeats_until_pool_exhausted() -> None:
     """Позы не повторяются, пока не закончатся все уникальные."""
     result = tren(SAMPLE_POSES, level="beginner", duration=200, focus="full_body")
 
@@ -81,7 +81,7 @@ def test_no_repeats_until_pool_exhausted():
     assert len(set(first_round)) == pool_size
 
 
-def test_respects_duration_limit():
+def test_respects_duration_limit() -> None:
     """Суммарное время поз не превышает заданную длительность."""
     duration = 90
     result = tren(SAMPLE_POSES, level="beginner", duration=duration, focus="full_body")
@@ -92,7 +92,7 @@ def test_respects_duration_limit():
     assert total <= duration, f"Сумма {total} > {duration}"
 
 
-def test_empty_result_when_no_matching_poses():
+def test_empty_result_when_no_matching_poses() -> None:
     """Если нет подходящих поз — возвращается пустой список."""
     poses_no_timing = [
         {
@@ -106,7 +106,7 @@ def test_empty_result_when_no_matching_poses():
     assert result == []
 
 
-def test_focus_filter_back():
+def test_focus_filter_back() -> None:
     """get_poses_by_focus('back') возвращает только позы для спины."""
     filtered = get_poses_by_focus(SAMPLE_POSES, "back")
     names = {p["name_en"] for p in filtered}
@@ -118,7 +118,7 @@ def test_focus_filter_back():
     assert "Crow Pose" not in names  # "руки, пресс"
 
 
-def test_advanced_includes_hard_poses():
+def test_advanced_includes_hard_poses() -> None:
     """Advanced уровень включает позы сложности 3 и 4."""
     result = tren(SAMPLE_POSES, level="advanced", duration=300, focus="full_body")
 
@@ -128,7 +128,7 @@ def test_advanced_includes_hard_poses():
     assert any(name in hard_names for name in result)
 
 
-def test_focus_filter_full_body_returns_all():
+def test_focus_filter_full_body_returns_all() -> None:
     """full_body фокус возвращает все позы без фильтрации."""
     filtered = get_poses_by_focus(SAMPLE_POSES, "full_body")
     assert len(filtered) == len(SAMPLE_POSES)

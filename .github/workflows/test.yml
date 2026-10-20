@@ -6,20 +6,34 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   python:
     name: Python (pytest)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.14'
 
       - name: Install dependencies
-        run: pip install -r backend/requirements.txt
+        run: pip install -r backend/requirements-dev.txt
 
       - name: Run tests
-        run: pytest
+        run: |
+          echo "ЧТО: pytest - автотесты Python (файлы *_test.py и test_*.py)."
+          echo "ЗАЧЕМ: тесты подтверждают, что изменение не сломало то, что уже работало."
+          if ! pytest; then
+            echo "::error title=pytest::Упали тесты, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: найди в логе FAILED и блок с assert - там ожидаемое"
+            echo "  и фактическое значение. Локально: pip install -r backend/requirements-dev.txt"
+            echo "  && pytest -x -v. Если поведение поменяли намеренно - обнови тест."
+            exit 1
+          fi

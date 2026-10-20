@@ -1,9 +1,8 @@
 boto3 == 1.43.106
 python-dotenv == 1.2.3
 fastapi == 0.142.2
-pytest == 9.1.1
 httpcore == 1.0.9
 httpx == 0.28.1
 pydantic == 2.13.5
-uvicorn[standard]
+uvicorn[standard] == 0.54.0
 psycopg2-binary == 2.9.13

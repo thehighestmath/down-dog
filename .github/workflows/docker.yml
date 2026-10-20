@@ -6,15 +6,76 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: docker compose build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Validate compose file
-        run: docker compose config --quiet
+        run: |
+          echo "ЧТО: docker compose config - валидность docker-compose.yml."
+          echo "ЗАЧЕМ: опечатка в compose ломает запуск всего проекта у всей команды."
+          if ! docker compose config --quiet; then
+            echo "::error title=docker compose config::docker-compose.yml невалиден"
+            echo "КАК ИСПРАВИТЬ: локально docker compose config покажет строку с ошибкой."
+            exit 1
+          fi
 
       - name: Build images
-        run: docker compose build
+        run: |
+          echo "ЧТО: сборка Docker-образов всех сервисов."
+          echo "ЗАЧЕМ: если образ не собирается в CI, он не соберётся и при деплое."
+          if ! docker compose build; then
+            echo "::error title=docker build::Образ не собирается, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: найди в логе шаг Dockerfile с ошибкой (=> ERROR [сервис N/M])."
+            echo "  Частые причины: файл не попал в build context или отфильтрован .dockerignore,"
+            echo "  нет пакета в requirements.txt/package.json. Локально: docker compose build"
+            exit 1
+          fi
+
+      # Images that build are not necessarily images that start: bring the
+      # whole stack up and check that every service actually works.
+      # s3 is a one-shot job (uploads images and exits), the smoke test runs it.
+      - name: Start stack
+        run: |
+          echo "ЧТО: запуск всех сервисов из docker-compose.yml (кроме разового s3)."
+          echo "ЗАЧЕМ: собранный образ ещё не значит работающий - контейнер может упасть"
+          echo "       на старте из-за импорта, версии Python или конфигурации."
+          mapfile -t services < <(docker compose config --services | grep -vx s3)
+          echo "Сервисы: ${services[*]}"
+          if ! docker compose up -d --wait --wait-timeout 180 "${services[@]}"; then
+            echo "::error title=docker compose up::Сервисы не запустились, логи в шаге Logs on failure"
+            echo "КАК ИСПРАВИТЬ: открой шаг Logs on failure и найди Traceback/ошибку"
+            echo "  упавшего контейнера. Локально: docker compose up"
+            exit 1
+          fi
+
+      - name: Smoke test
+        run: |
+          echo "ЧТО: смоук-тест - каждый сервис отвечает и делает свою работу: API бэкенда"
+          echo "     (с БД), фронт и прокси /api/ через nginx, Postgres, MinIO, Adminer,"
+          echo "     загрузка картинок скриптом s3."
+          echo "ЗАЧЕМ: минимальная проверка, что приложение реально работает целиком,"
+          echo "       а не только собирается."
+          if ! bash scripts/smoke_test.sh; then
+            echo "::error title=smoke test::Смоук-тест не пройден, см. строки FAIL в логе шага"
+            echo "КАК ИСПРАВИТЬ: у каждой строки FAIL есть подсказка, какой сервис смотреть;"
+            echo "  логи контейнеров - в шаге Logs on failure. Локально:"
+            echo "  docker compose up -d --wait && bash scripts/smoke_test.sh"
+            exit 1
+          fi
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v

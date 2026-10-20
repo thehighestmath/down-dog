@@ -6,6 +6,9 @@ on:
       - master
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Typecheck + build
@@ -14,12 +17,14 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '20'
+          node-version: '26'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -28,4 +33,13 @@ jobs:
 
       # "build" = tsc -b && vite build, so TypeScript errors fail the job
       - name: Build
-        run: npm run build
+        run: |
+          echo "ЧТО: проверка типов TypeScript (tsc -b) и сборка фронтенда (vite build)."
+          echo "ЗАЧЕМ: ошибка типов - это баг, найденный до запуска; а то, что не собирается,"
+          echo "       нельзя задеплоить."
+          if ! npm run build; then
+            echo "::error title=frontend build::Фронтенд не собирается, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: ошибки tsc выглядят как file.tsx(строка,колонка): error TSxxxx."
+            echo "  Локально: cd frontend && npm ci && npm run build"
+            exit 1
+          fi

@@ -1,0 +1,3 @@
+# Зависимости для разработки и CI, в Docker-образ не попадают
+-r requirements.txt
+pytest == 9.1.1

@@ -1,0 +1,25 @@
+# yamllint config. Formatting (quotes, spacing) is prettier's job, so the
+# rules here are tuned not to fight it and to catch real mistakes instead:
+# duplicate keys, bad indentation, yes/no/on/off used as booleans, etc.
+# Keep this file ASCII-only (Windows reads it in the system codepage).
+extends: default
+
+ignore: |
+  node_modules/
+  frontend/node_modules/
+  frontend/dist/
+
+rules:
+  # prettier never writes "---", don't require it
+  document-start: disable
+  # prettier wraps at 88, long URLs/commands can't be wrapped
+  line-length:
+    max: 120
+    level: warning
+  # prettier puts a single space before inline comments
+  comments:
+    min-spaces-from-content: 1
+  # `on:` in GitHub workflows is a key, not a boolean
+  truthy:
+    allowed-values: ['true', 'false']
+    check-keys: false

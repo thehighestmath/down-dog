@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import uuid
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from database import get_db_connection
@@ -18,7 +19,7 @@ logger = logging.getLogger("app")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def init_db():
+def init_db() -> None:
     sql_dir = os.path.join(BASE_DIR, "sql")
 
     if not os.path.exists(sql_dir):
@@ -50,7 +51,7 @@ def init_db():
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_db()
     yield
 
@@ -70,7 +71,7 @@ app.add_middleware(
 # Временное хранилище тренировок
 # -----------------------------------------
 
-workouts = {}
+workouts: dict[str, dict] = {}
 
 
 # -----------------------------------------
@@ -121,7 +122,7 @@ class AnalyticsEvent(BaseModel):
 @app.get("/api/poses")
 def get_poses(
     category: str | None = None, difficulty: int | None = None, focus: str | None = None
-):
+) -> list[dict]:
     poses = load_poses_from_db()
 
     # Фильтр по категории
@@ -145,7 +146,7 @@ def get_poses(
 
 
 @app.post("/api/workouts/generate")
-def generate_workout(request: WorkoutRequest):
+def generate_workout(request: WorkoutRequest) -> dict:
     # -------------------------------------
     # Проверяем длительность
     # -------------------------------------
@@ -220,7 +221,7 @@ def generate_workout(request: WorkoutRequest):
 
 
 @app.get("/api/workouts/{workout_id}")
-def get_workout(workout_id: str):
+def get_workout(workout_id: str) -> dict:
     workout = workouts.get(workout_id)
 
     if workout is None:

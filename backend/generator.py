@@ -40,7 +40,7 @@ def _fill_time(
     difficulty_filter: Callable[[int], bool],
 ) -> list[str]:
     """Заполняет время позами, используя все уникальные позы перед повторами."""
-    result = []
+    result: list[str] = []
 
     candidates = [
         p
@@ -52,8 +52,8 @@ def _fill_time(
     if not candidates:
         return result
 
-    pool = []
-    last_name = None
+    pool: list[dict] = []
+    last_name: str | None = None
 
     while t_max > 0:
         if not pool:
@@ -111,7 +111,7 @@ def tren(
         ],
     }
 
-    result = []
+    result: list[str] = []
     for diff_filter, num, den in plans.get(level, []):
         result.extend(_fill_time(duration * num // den, filtered, diff_filter))
 

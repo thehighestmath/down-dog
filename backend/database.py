@@ -12,6 +12,6 @@ DATABASE_DSN = psycopg2.extensions.make_dsn(
 )
 
 
-def get_db_connection():
+def get_db_connection() -> psycopg2.extensions.connection:
     conn = psycopg2.connect(DATABASE_DSN, cursor_factory=RealDictCursor)
     return conn

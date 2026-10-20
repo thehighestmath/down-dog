@@ -1,11 +1,16 @@
 version: 2
 
 # Once a week, one grouped PR per ecosystem — to avoid flooding the repo.
+# Actions are pinned to commit SHAs; dependabot updates the SHA and the
+# version comment next to it.
 updates:
   - package-ecosystem: pip
     directories: ['/backend', '/s3']
     schedule:
       interval: weekly
+    # wait a week after a release: hijacked releases are usually caught by then
+    cooldown:
+      default-days: 7
     groups:
       python:
         patterns: ['*']
@@ -14,6 +19,9 @@ updates:
     directories: ['/', '/frontend']
     schedule:
       interval: weekly
+    # wait a week after a release: hijacked releases are usually caught by then
+    cooldown:
+      default-days: 7
     groups:
       npm:
         patterns: ['*']
@@ -22,6 +30,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # wait a week after a release: hijacked releases are usually caught by then
+    cooldown:
+      default-days: 7
     groups:
       actions:
         patterns: ['*']
@@ -30,6 +41,9 @@ updates:
     directories: ['/backend', '/frontend', '/s3']
     schedule:
       interval: weekly
+    # wait a week after a release: hijacked releases are usually caught by then
+    cooldown:
+      default-days: 7
     groups:
       docker:
         patterns: ['*']
