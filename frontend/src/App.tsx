@@ -1,5 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import './App.css'
+import {
+  trackWorkoutAbandoned,
+  trackWorkoutCompleted,
+  trackWorkoutStarted,
+} from './analytics'
 import { fetchPoses, generateWorkout, getWorkoutById } from './api'
 import { FinishedScreen } from './components/FinishedScreen'
 import { HomeScreen } from './components/HomeScreen'
@@ -67,6 +72,11 @@ function App() {
   const startWorkout = (w: Workout) => {
     setActiveWorkout(w)
     setView('player')
+    trackWorkoutStarted(w.id, {
+      duration_min: w.duration_min,
+      level: w.level,
+      focus: w.focus,
+    })
   }
 
   if (view === 'player' && activeWorkout) {
@@ -75,10 +85,16 @@ function App() {
         workout={activeWorkout}
         poses={poses}
         onStop={() => {
+          trackWorkoutAbandoned(activeWorkout.id)
           setView('home')
           setActiveWorkout(null)
         }}
-        onFinish={() => setView('finished')}
+        onFinish={() => {
+          trackWorkoutCompleted(activeWorkout.id, {
+            poses_count: activeWorkout.poses.length,
+          })
+          setView('finished')
+        }}
       />
     )
   }

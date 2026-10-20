@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { trackPoseViewed } from '../analytics'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
 
@@ -45,6 +46,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const [running, setRunning] = useState(true)
   const [confirmStop, setConfirmStop] = useState(false)
   const finishedRef = useRef(false)
+  const prevPoseIdx = useRef(-1)
 
   // Тик таймера
   useEffect(() => {
@@ -84,6 +86,14 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const current = playlist[currentIdx]
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0
   const progress = totalSec > 0 ? elapsed / totalSec : 0
+
+  // Трекинг смены позы
+  useEffect(() => {
+    if (currentIdx !== prevPoseIdx.current && current) {
+      prevPoseIdx.current = currentIdx
+      trackPoseViewed(workout.id, current.name, currentIdx)
+    }
+  }, [currentIdx, current, workout.id])
 
   // Пропустить текущую позу
   const handleSkip = () => {
