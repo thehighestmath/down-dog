@@ -8,6 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY s3/s3.py .
 COPY Images ./Images
+COPY audio ./audio
 
 # Run as an unprivileged user: if the app is compromised, the attacker
 # does not get root inside the container
