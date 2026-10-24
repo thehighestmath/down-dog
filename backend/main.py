@@ -8,6 +8,8 @@ from generator import get_poses_by_focus, tren
 from logging_config import logger
 from pydantic import BaseModel
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 def init_db() -> None:
     sql_dir = os.path.join(BASE_DIR, "sql")
