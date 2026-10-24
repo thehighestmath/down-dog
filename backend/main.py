@@ -5,7 +5,7 @@ from database import get_db_connection
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from generator import get_poses_by_focus, tren
-from logging_config import logger
+from logging_config import logger  # type: ignore[import-not-found]
 from pydantic import BaseModel
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
