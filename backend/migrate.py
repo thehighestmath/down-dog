@@ -58,7 +58,7 @@ def run_migrations() -> None:
                     row = cursor.fetchone()
 
                     if row is not None:
-                        if row["checksum"] != checksum:
+                        if row["checksum"] != checksum:  # type: ignore
                             raise RuntimeError(
                                 f"Миграция {filename} была изменена "
                                 "после применения. Создай новую миграцию."
