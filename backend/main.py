@@ -1,35 +1,26 @@
-import logging
 import os
 import uuid
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 
 from database import get_db_connection
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from generator import get_poses_by_focus, tren
-from pydantic import BaseModel
 from logging_config import logger
+from pydantic import BaseModel
 
 
 def init_db() -> None:
     sql_dir = os.path.join(BASE_DIR, "sql")
 
     if not os.path.isdir(sql_dir):
-        raise FileNotFoundError(
-            f"Папка миграций не найдена: {sql_dir}"
-        )
+        raise FileNotFoundError(f"Папка миграций не найдена: {sql_dir}")
 
     sql_files = sorted(
-        file_name
-        for file_name in os.listdir(sql_dir)
-        if file_name.endswith(".sql")
+        file_name for file_name in os.listdir(sql_dir) if file_name.endswith(".sql")
     )
 
     if not sql_files:
-        raise RuntimeError(
-            f"В папке {sql_dir} нет SQL-файлов"
-        )
+        raise RuntimeError(f"В папке {sql_dir} нет SQL-файлов")
 
     conn = None
 

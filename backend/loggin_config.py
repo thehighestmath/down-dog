@@ -1,6 +1,6 @@
 import logging
-from pathlib import Path
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 LOG_DIR = BASE_DIR / "logs"
@@ -17,9 +17,7 @@ file_handler = RotatingFileHandler(
 
 console_handler = logging.StreamHandler()
 
-formatter = logging.Formatter(
-    "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-)
+formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
 file_handler.setFormatter(formatter)
 console_handler.setFormatter(formatter)

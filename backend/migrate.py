@@ -5,7 +5,6 @@ from pathlib import Path
 
 from database import get_db_connection
 
-
 BASE_DIR = Path(__file__).resolve().parent
 SQL_DIR = BASE_DIR / "sql"
 
@@ -23,9 +22,7 @@ def get_checksum(file_path: Path) -> str:
 
 def run_migrations() -> None:
     if not SQL_DIR.is_dir():
-        raise FileNotFoundError(
-            f"Папка с миграциями не найдена: {SQL_DIR}"
-        )
+        raise FileNotFoundError(f"Папка с миграциями не найдена: {SQL_DIR}")
 
     sql_files = sorted(SQL_DIR.glob("*.sql"))
 
