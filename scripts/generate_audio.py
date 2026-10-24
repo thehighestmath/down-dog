@@ -7,9 +7,6 @@ from elevenlabs.client import ElevenLabs
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
-
-API_KEY = os.getenv("ELEVENLABS_API_KEY", "свой ключ")
-client = ElevenLabs(api_key=API_KEY)
 AUDIO_DIR = Path(__file__).resolve().parents[1]
 SQL_FILE = AUDIO_DIR.parent / "backend" / "sql" / "02_seed_poses.sql"
 
@@ -20,22 +17,24 @@ FOLDERS = {
 }
 
 PHRASES = {
-    "ru": [
-        "Начинаем тренировку. Первая поза — ",
-        "Входим в позу",
-        "Сделайте глубокий вдох... и медленный выдох.",
-        "Держите позу... ещё ... секунд.",
-        "Плавно выходим. Переход к следующей позе.",
-        "Тренировка завершена. Отдохните в Шавасане.",
-    ],
-    "en": [
-        "Let's begin the workout. The first pose is",
-        "Move into the",
-        "Take a deep breath in... and a slow breath out.",
-        "Hold the pose... for another ... seconds.",
-        "Gently come out of the pose. Transitioning to the next pose.",
-        "The workout is complete. Rest in Savasana.",
-    ],
+    "ru": {
+        "start": "Начинаем тренировку. Первая поза —",
+        "enter": "Входим в позу",
+        "breathe": "Сделайте глубокий вдох... и медленный выдох.",
+        "hold": "Держите позу ещё",
+        "seconds": "секунд.",
+        "next": "Плавно выходим. Переход к следующей позе.",
+        "finish": "Тренировка завершена. Отдохните в Шавасане.",
+    },
+    "en": {
+        "start": "Let's begin the workout. The first pose is",
+        "enter": "Move into",
+        "breathe": "Take a deep breath in... and a slow breath out.",
+        "hold": "Hold the pose for another",
+        "seconds": "seconds.",
+        "next": "Gently come out of the pose. Transitioning to the next pose.",
+        "finish": "The workout is complete. Rest in Savasana.",
+    },
 }
 
 Pose = tuple[str, str, str | None, int | None, int | None]
@@ -88,8 +87,7 @@ def pose_filename(name_en: str, audio_url: str | None) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name).strip("_") + ".mp3"
 
 
-def speak(text: str, lang: str, kind: str, filename: str) -> None:
-    """Озвучивает текст и сохраняет mp3; уже существующие файлы пропускает."""
+def speak(client: ElevenLabs, text: str, lang: str, kind: str, filename: str) -> None:
     path = AUDIO_DIR / FOLDERS[lang][kind] / filename
     if path.exists():
         return
@@ -106,24 +104,25 @@ def speak(text: str, lang: str, kind: str, filename: str) -> None:
 
 
 def main() -> None:
+    client = ElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
     seconds: set[int] = set()
 
     for name_ru, name_en, audio_url, hold_time_sec, full_cycle_sec in load_poses(
         SQL_FILE
     ):
         filename = pose_filename(name_en, audio_url)
-        speak(name_ru, "ru", "poses", filename)
-        speak(name_en, "en", "poses", filename)
+        speak(client, name_ru, "ru", "poses", filename)
+        speak(client, name_en, "en", "poses", filename)
         seconds.update(s for s in (hold_time_sec, full_cycle_sec) if s)
 
-    for lang, texts in PHRASES.items():
-        for i, text in enumerate(texts, 1):
-            speak(text, lang, "phrases", f"{i}.mp3")
+    for lang, phrases in PHRASES.items():
+        for key, text in phrases.items():
+            speak(client, text, lang, "phrases", f"{key}.mp3")
 
     for lang in VOICES:
         for n in sorted(seconds):
             # озвучиваем только число, без слова «секунд»
-            speak(str(n), lang, "seconds", f"{n}.mp3")
+            speak(client, str(n), lang, "seconds", f"{n}.mp3")
 
 
 if __name__ == "__main__":
