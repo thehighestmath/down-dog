@@ -9,53 +9,57 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
-
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
-logger = logging.getLogger("app")
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+from logging_config import logger
 
 
 def init_db() -> None:
     sql_dir = os.path.join(BASE_DIR, "sql")
 
-    if not os.path.exists(sql_dir):
-        logger.warning("Папка миграций НЕ найдена по пути: %s", sql_dir)
-        return
+    if not os.path.isdir(sql_dir):
+        raise FileNotFoundError(
+            f"Папка миграций не найдена: {sql_dir}"
+        )
 
-    sql_files = sorted([f for f in os.listdir(sql_dir) if f.endswith(".sql")])
+    sql_files = sorted(
+        file_name
+        for file_name in os.listdir(sql_dir)
+        if file_name.endswith(".sql")
+    )
 
     if not sql_files:
-        logger.warning("В папке %s не найдено .sql файлов", sql_dir)
-        return
+        raise RuntimeError(
+            f"В папке {sql_dir} нет SQL-файлов"
+        )
+
+    conn = None
 
     try:
         conn = get_db_connection()
+
         with conn.cursor() as cursor:
             for file_name in sql_files:
                 file_path = os.path.join(sql_dir, file_name)
-                logger.info("Применение миграции: %s", file_name)
+                logger.info("Выполнение SQL-файла: %s", file_name)
 
-                with open(file_path, encoding="utf-8") as f:
-                    cursor.execute(f.read())
+                with open(file_path, encoding="utf-8") as sql_file:
+                    cursor.execute(sql_file.read())
 
         conn.commit()
-        conn.close()
-        logger.info("Все миграции PostgreSQL успешно применены!")
+        logger.info("Инициализация базы данных завершена")
 
-    except Exception as e:
-        logger.error("Ошибка при применении миграции: %s", e, exc_info=True)
+    except Exception:
+        if conn is not None:
+            conn.rollback()
+
+        logger.exception("Ошибка инициализации базы данных")
+        raise
+
+    finally:
+        if conn is not None:
+            conn.close()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    init_db()
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,

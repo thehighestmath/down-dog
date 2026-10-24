@@ -22,9 +22,32 @@ services:
         condition: service_healthy
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     networks:
       - app-network
     restart: unless-stopped
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: dockerfilemigrations
+    container_name: app-migrations
+    command: ['python', 'migrate.py']
+    environment:
+      - PYTHONUNBUFFERED=1
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=app_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/app_db
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: 'no'
 
   frontend:
     build: ./frontend
@@ -105,18 +128,6 @@ services:
     networks:
       - app-network
     restart: 'no'
-
-  microservice:
-    build:
-      context: ./microservice
-    image: simple_microservice
-    container_name: simple_microservice
-    restart: unless-stopped
-    ports:
-      - '8001:8000'
-    command: gunicorn -b 0.0.0.0:8000 -k uvicorn.workers.UvicornWorker simple_microservice:api
-    networks:
-      - app-network
 
 volumes:
   minio_data:
