@@ -1,19 +1,18 @@
 import logging
 import os
-import uuid
 import re
-import boto3
-
-from functools import cache
-from typing import Any
-from botocore.exceptions import ClientError
-from fastapi.responses import StreamingResponse
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import cache
+from typing import Any
 
+import boto3
+from botocore.exceptions import ClientError
 from database import get_db_connection
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
 
@@ -82,6 +81,7 @@ workouts: dict[str, dict] = {}
 # -----------------------------------------
 # S3 (MinIO): озвучка
 # -----------------------------------------
+
 
 AUDIO_LANGS = {"ru", "en"}
 AUDIO_KINDS = {"poses", "phrases", "numbers"}
@@ -261,10 +261,6 @@ def get_workout(workout_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Тренировка не найдена")
 
     return workout
-
-# =========================================
-# GET /api/audio/{lang}/{kind}/{name}
-# =========================================
 
 
 @app.get("/api/audio/{lang}/{kind}/{name}")

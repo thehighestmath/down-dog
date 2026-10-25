@@ -1,15 +1,3 @@
-"""Генерация озвучки поз, фраз и чисел для сайта йоги через ElevenLabs.
-
-Раскладка файлов (одна для обоих языков, суффикс языка везде одинаковый):
-    audio/poses_{lang}/{slug}.mp3    — название позы
-    audio/phrases_{lang}/{key}.mp3   — фраза тренировки
-    audio/numbers_{lang}/{n}.mp3     — число секунд
-
-Запуск из корня репозитория:
-    $env:ELEVENLABS_API_KEY = "sk_..."
-    py scripts/generate_audio.py
-"""
-
 import logging
 import os
 import re
@@ -28,12 +16,6 @@ SQL_FILE = REPO_DIR / "backend" / "sql" / "02_seed_poses.sql"
 LANGS = ("ru", "en")
 VOICES = {"ru": "pNInz6obpgDQGcFmaJgB", "en": "JBFqnCBsd6RMkjVDRZzb"}
 
-# Фразы тренировки. Фронт склеивает их с отдельными файлами поз и чисел:
-#   start + <поза>                       «Начинаем тренировку. Первая поза — Поза орла»
-#   enter + <поза>                       «Входим в позу … Поза моста»
-#   hold + <число> + seconds             «Держите позу ещё 30 секунд»
-# Поэтому фразы, к которым что-то приклеивается, обрываются ровно на месте вставки,
-# без многоточий: синтезатор читает «...» как паузу.
 PHRASES = {
     "ru": {
         "start": "Начинаем тренировку. Первая поза —",
@@ -60,8 +42,6 @@ SqlValue = str | int | None
 
 @dataclass(frozen=True)
 class Pose:
-    """Поза из таблицы poses: всё, что нужно для озвучки."""
-
     name_ru: str
     name_en: str
     audio_url: str | None
@@ -70,7 +50,6 @@ class Pose:
 
     @property
     def filename(self) -> str:
-        """Имя mp3: из audio_url, а если его нет — из английского названия."""
         if self.audio_url:
             return os.path.basename(self.audio_url)
         name = self.name_en.lower().replace("'", "").replace(" pose", "")
@@ -78,17 +57,13 @@ class Pose:
 
     @property
     def seconds(self) -> set[int]:
-        """Время удержания и полный цикл без пустых значений."""
         return {s for s in (self.hold_time_sec, self.full_cycle_sec) if s}
 
-
-# ---------- Разбор seed-файла ----------
 
 _VALUE_RE = re.compile(r"\s*(?:'((?:[^']|'')*)'|(NULL)\b|(-?\d+)(?![\d.]))\s*", re.I)
 
 
 def _parse_value(row: str, pos: int) -> tuple[SqlValue, int]:
-    """Читает одно значение строки VALUES. Неизвестный тип — явная ошибка."""
     match = _VALUE_RE.match(row, pos)
     if match is None:
         msg = f"Неподдерживаемое значение в seed: {row[pos : pos + 30]!r}"
@@ -99,7 +74,6 @@ def _parse_value(row: str, pos: int) -> tuple[SqlValue, int]:
 
 
 def _parse_rows(values: str) -> list[list[SqlValue]]:
-    """Разбирает `(...), (...), ...` до первого символа после последней строки."""
     rows: list[list[SqlValue]] = []
     pos = 0
     while True:
@@ -129,12 +103,6 @@ def _parse_rows(values: str) -> list[list[SqlValue]]:
 
 
 def load_poses(sql_file: Path) -> list[Pose]:
-    """Достаёт позы из единственного INSERT INTO poses в seed-файле.
-
-    Падает с ошибкой, а не молча сдвигает колонки, если: INSERT не один,
-    в строке не столько значений, сколько колонок, встретилось значение
-    неподдерживаемого типа (TRUE, 1.5, ...) или имена файлов совпали.
-    """
     sql = sql_file.read_text(encoding="utf-8")
     inserts = [m.end() for m in re.finditer(r"INSERT\s+INTO\s+poses\b", sql, re.I)]
     if len(inserts) != 1:
@@ -178,17 +146,7 @@ def _int_or_none(value: SqlValue) -> int | None:
     return value if isinstance(value, int) else None
 
 
-# ---------- Озвучка ----------
-
-
-
 def speak(client: ElevenLabs, text: str, lang: str, path: Path) -> None:
-    """Озвучивает текст в mp3.
-
-    Готовые файлы пропускает, пустые (0 байт) перегенерирует. Пишет сначала
-    во временный .part и переименовывает только после успешной записи, поэтому
-    оборванный поток не оставляет на диске файла, похожего на готовый.
-    """
     if path.exists() and path.stat().st_size > 0:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -214,8 +172,6 @@ def speak(client: ElevenLabs, text: str, lang: str, path: Path) -> None:
 def main() -> None:
     poses = load_poses(SQL_FILE)
     seconds: set[int] = set().union(*(pose.seconds for pose in poses))
-
-    # KeyError сразу при запуске, если ключ не задан, — как BUCKET_NAME в s3/s3.py
     client = ElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
 
     for lang in LANGS:
