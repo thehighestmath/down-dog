@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid
 
@@ -5,10 +6,16 @@ from database import get_db_connection
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from generator import get_poses_by_focus, tren
-from logging_config import logger  # pyright: ignore[reportMissingImports] # noqa.
 from pydantic import BaseModel
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+
+logger = logging.getLogger("app")
 
 
 def init_db() -> None:
