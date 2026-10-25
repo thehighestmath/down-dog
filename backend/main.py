@@ -90,7 +90,6 @@ AUDIO_NAME_RE = re.compile(r"[a-z0-9_]+")
 
 @cache
 def get_s3() -> Any:
-    """Клиент S3 создаётся при первом запросе, а не при импорте модуля."""
     return boto3.client(
         "s3",
         endpoint_url=os.environ["MINIO_ENDPOINT"],
@@ -101,10 +100,6 @@ def get_s3() -> Any:
 
 
 def audio_name(name_en: str, audio_url: str | None) -> str:
-    """Имя mp3 позы без расширения — то же правило, что в скрипте генерации.
-
-    '/audio/eagle.mp3' -> 'eagle'; без audio_url: "Child's Pose" -> 'childs'.
-    """
     if audio_url:
         return os.path.basename(audio_url).removesuffix(".mp3")
     name = name_en.lower().replace("'", "").replace(" pose", "")
