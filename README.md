@@ -4,6 +4,7 @@
 
 - [MVP.md](MVP.md) — что входит в MVP, что уже сделано, API и логика генератора
 - [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) — куда проект развивается после MVP
+- [docs/TECHNICAL.md](docs/TECHNICAL.md) — подробно про MinIO, FastAPI и виртуальное окружение
 - [Доска задач](https://github.com/users/thehighestmath/projects/5) и майлстоуны: [v0.0.1a (MVP)](https://github.com/thehighestmath/down-dog/milestone/1), [v1.0.0](https://github.com/thehighestmath/down-dog/milestone/2)
 
 ## Быстрый старт (Docker)
