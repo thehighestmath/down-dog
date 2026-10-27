@@ -42,6 +42,8 @@ jobs:
           fi
           today=$(date +%F)
 
+          # $-переменные в одинарных кавычках ниже - переменные GraphQL и jq, не shell
+          # shellcheck disable=SC2016
           project=$(gh api graphql \
             -f login="$OWNER" -F number="$PROJECT_NUMBER" \
             -f query='
@@ -61,6 +63,7 @@ jobs:
             | select(.dataType == "DATE") | {(.name): .id}] | add // {}' <<<"$project")
 
           # Строки "<item id>\t<статус>" для задач, у которых не заполнено "В <статус> с"
+          # shellcheck disable=SC2016
           todo=$(gh api graphql --paginate \
             -f login="$OWNER" -F number="$PROJECT_NUMBER" \
             -f query='
@@ -126,7 +129,9 @@ jobs:
             exit 1
           fi
 
-          # Строки "<repo>\t<номер>\t<add|remove>" для issue, где метку надо поставить или снять
+          # Строки "<repo>\t<номер>\t<add|remove>" для issue, где метку надо поставить или снять.
+          # $-переменные в одинарных кавычках - переменные GraphQL и jq, не shell
+          # shellcheck disable=SC2016
           changes=$(gh api graphql --paginate \
             -f login="$OWNER" -F number="$PROJECT_NUMBER" \
             -f query='
