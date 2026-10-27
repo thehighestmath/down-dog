@@ -231,7 +231,7 @@ def get_workout(workout_id: str) -> dict:
 
 
 @app.post("/api/analytics/track")
-def track_event(event: AnalyticsEvent):
+def track_event(event: AnalyticsEvent) -> dict[str, str]:
 
     logger.info(f"Event: {json.dumps(event.dict())}")
 

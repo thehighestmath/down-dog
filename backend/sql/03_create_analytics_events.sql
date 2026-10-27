@@ -13,4 +13,3 @@ CREATE TABLE IF NOT EXISTS analytics_events (
     payload JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
