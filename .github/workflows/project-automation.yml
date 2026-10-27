@@ -1,0 +1,173 @@
+name: Project automation
+
+# Автоматизация GitHub Project (свои правила в самом проекте задать нельзя).
+#
+# fill: заполняет поля "В <статус> с" датой, когда задача
+# оказалась в этом статусе. Смену статуса в пользовательском проекте нельзя
+# поймать триггером Actions, поэтому workflow запускается по расписанию:
+# находит задачи, у которых пустое поле для текущего статуса, и ставит туда
+# сегодняшнюю дату. Уже заполненные даты не трогает.
+#
+# assignees: вешает метку multiple-assignees на issue, у которых больше одного
+# исполнителя, и снимает её, когда исполнитель остался один.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: project-automation
+  cancel-in-progress: false
+
+jobs:
+  fill:
+    name: Fill "В <статус> с" fields
+    runs-on: ubuntu-latest
+    env:
+      # GITHUB_TOKEN не видит пользовательские проекты: нужен classic PAT со scope project
+      GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+      OWNER: thehighestmath
+      PROJECT_NUMBER: 5
+      TZ: Europe/Moscow
+    steps:
+      - name: Fill dates
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error title=PROJECT_TOKEN::Не задан секрет PROJECT_TOKEN (classic PAT со scope project)"
+            exit 1
+          fi
+          today=$(date +%F)
+
+          project=$(gh api graphql \
+            -f login="$OWNER" -F number="$PROJECT_NUMBER" \
+            -f query='
+              query($login: String!, $number: Int!) {
+                user(login: $login) {
+                  projectV2(number: $number) {
+                    id
+                    fields(first: 50) {
+                      nodes { ... on ProjectV2Field { id name dataType } }
+                    }
+                  }
+                }
+              }')
+          project_id=$(jq -r '.data.user.projectV2.id' <<<"$project")
+          # {"В Todo с": "PVTF_...", ...}
+          date_fields=$(jq -c '[.data.user.projectV2.fields.nodes[]
+            | select(.dataType == "DATE") | {(.name): .id}] | add // {}' <<<"$project")
+
+          # Строки "<item id>\t<статус>" для задач, у которых не заполнено "В <статус> с"
+          todo=$(gh api graphql --paginate \
+            -f login="$OWNER" -F number="$PROJECT_NUMBER" \
+            -f query='
+              query($login: String!, $number: Int!, $endCursor: String) {
+                user(login: $login) {
+                  projectV2(number: $number) {
+                    items(first: 100, after: $endCursor) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes {
+                        id
+                        status: fieldValueByName(name: "Status") {
+                          ... on ProjectV2ItemFieldSingleSelectValue { name }
+                        }
+                        fieldValues(first: 50) {
+                          nodes {
+                            ... on ProjectV2ItemFieldDateValue {
+                              field { ... on ProjectV2Field { name } }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }' \
+            --jq '.data.user.projectV2.items.nodes[]
+              | select(.status.name != null)
+              | ("В " + .status.name + " с") as $field
+              | select([.fieldValues.nodes[].field.name] | index($field) | not)
+              | [.id, .status.name] | @tsv')
+
+          updated=0
+          while IFS=$'\t' read -r item status; do
+            [ -n "$item" ] || continue
+            field_id=$(jq -r --arg f "В $status с" '.[$f] // empty' <<<"$date_fields")
+            if [ -z "$field_id" ]; then
+              echo "::warning::В проекте нет date-поля \"В $status с\", статус пропущен"
+              continue
+            fi
+            gh project item-edit --project-id "$project_id" --id "$item" \
+              --field-id "$field_id" --date "$today" >/dev/null
+            echo "$item: В $status с = $today"
+            updated=$((updated + 1))
+          done <<<"$todo"
+
+          echo "Обновлено задач: $updated" | tee -a "$GITHUB_STEP_SUMMARY"
+
+  assignees:
+    name: Label issues with several assignees
+    runs-on: ubuntu-latest
+    env:
+      # Для меток PAT нужен ещё и scope repo
+      GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+      OWNER: thehighestmath
+      PROJECT_NUMBER: 5
+      LABEL: multiple-assignees
+    steps:
+      - name: Sync label
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error title=PROJECT_TOKEN::Не задан секрет PROJECT_TOKEN (classic PAT со scope project и repo)"
+            exit 1
+          fi
+
+          # Строки "<repo>\t<номер>\t<add|remove>" для issue, где метку надо поставить или снять
+          changes=$(gh api graphql --paginate \
+            -f login="$OWNER" -F number="$PROJECT_NUMBER" \
+            -f query='
+              query($login: String!, $number: Int!, $endCursor: String) {
+                user(login: $login) {
+                  projectV2(number: $number) {
+                    items(first: 100, after: $endCursor) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes {
+                        content {
+                          ... on Issue {
+                            number
+                            repository { nameWithOwner }
+                            assignees { totalCount }
+                            labels(first: 100) { nodes { name } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }' \
+            --jq '.data.user.projectV2.items.nodes[].content
+              | select(.number != null)
+              | (.assignees.totalCount > 1) as $many
+              | ([.labels.nodes[].name] | index(env.LABEL) != null) as $labeled
+              | if $many and ($labeled | not) then [.repository.nameWithOwner, .number, "add"]
+                elif ($many | not) and $labeled then [.repository.nameWithOwner, .number, "remove"]
+                else empty end
+              | @tsv')
+
+          while IFS=$'\t' read -r repo number action; do
+            [ -n "$repo" ] || continue
+            if [ "$action" = add ]; then
+              if ! gh label list -R "$repo" --limit 500 --json name --jq '.[].name' | grep -Fxq "$LABEL"; then
+                gh label create "$LABEL" -R "$repo" --color d93f0b \
+                  --description "У задачи должен быть один исполнитель"
+              fi
+              gh issue edit "$number" -R "$repo" --add-label "$LABEL" >/dev/null
+            else
+              gh issue edit "$number" -R "$repo" --remove-label "$LABEL" >/dev/null
+            fi
+            echo "$repo#$number: $action $LABEL" | tee -a "$GITHUB_STEP_SUMMARY"
+          done <<<"$changes"
