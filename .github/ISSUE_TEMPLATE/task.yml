@@ -1,0 +1,45 @@
+name: Задача
+description: Новая фича, доработка или техническая задача
+title: 'feat: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Заголовок — в формате Conventional Commits, как у PR: `feat(api): ...`, `ci: ...`, `refactor(db): ...`.
+        Хорошая задача понятна человеку, который не был на созвоне: зачем она, что считается готовым.
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Зачем
+      description: Какую проблему решаем или что получит пользователь / команда.
+      placeholder: Сейчас тренировка генерируется без учёта уровня, новички получают сложные позы.
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: Что сделать
+      description: Суть задачи. Без готового решения — только то, что нужно получить.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Критерии приёмки
+      description: По этим пунктам ревьюер проверит PR. Каждый — проверяемый.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: hints
+    attributes:
+      label: Подсказки и ссылки
+      description: Где смотреть в коде, полезная документация, связанные задачи.
+    validations:
+      required: false

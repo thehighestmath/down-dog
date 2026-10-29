@@ -22,18 +22,7 @@
 
 ### 2.1 MVP — Ядро тренировки
 
-| ID   | Требование                                              | Приоритет |
-| ---- | ------------------------------------------------------- | --------- |
-| F-01 | Настройки: длительность (5-30 мин), уровень, фокус      | High      |
-| F-02 | Сохранение настроек в localStorage                      | Medium    |
-| F-03 | Rule-based генерация тренировки                         | High      |
-| F-04 | Последовательность: разминка → основная часть → заминка | High      |
-| F-05 | Тайминг: удержание (15-60 сек), переход (5 сек)         | High      |
-| F-06 | Отображение позы: название + изображение + текст        | High      |
-| F-07 | Таймер обратного отсчёта (визуальный + звук)            | High      |
-| F-08 | Прогресс-бар тренировки                                 | High      |
-| F-09 | TTS-озвучка инструкций (1 голос)                        | High      |
-| F-10 | Кнопка "Стоп" (завершение)                              | Medium    |
+Требования MVP со статусом реализации — в [MVP.md, раздел 2](MVP.md). Там же отмечено, что из этого уже сделано.
 
 ### 2.2 Phase 2 — Пользователь и история
 
@@ -47,12 +36,12 @@
 
 ### 2.3 Phase 3 — Polish
 
-| ID   | Требование                          | Приоритет |
-| ---- | ----------------------------------- | --------- |
-| F-30 | Offline-режим (PWA, Service Worker) | Low       |
-| F-31 | Обратная связь (like/dislike поз)   | Low       |
-| F-32 | Пропуск позы / пауза                | Low       |
-| F-33 | Фоновая музыка (опционально)        | Low       |
+| ID   | Требование                           | Приоритет |
+| ---- | ------------------------------------ | --------- |
+| F-30 | Offline-режим (PWA, Service Worker)  | Low       |
+| F-31 | Обратная связь (like/dislike поз)    | Low       |
+| F-32 | ~~Пропуск позы / пауза~~ — уже в MVP | —         |
+| F-33 | Фоновая музыка (опционально)         | Low       |
 
 ### 2.4 Phase 4 — Scale (Post-MVP)
 
@@ -69,13 +58,7 @@
 
 ### 3.1 MVP
 
-| ID    | Требование              | Метрика                |
-| ----- | ----------------------- | ---------------------- |
-| NF-01 | Генерация тренировки    | < 1 секунды            |
-| NF-02 | Запуск TTS-аудио        | < 500 мс (из кэша)     |
-| NF-03 | Время загрузки страницы | < 2 секунд             |
-| NF-04 | Мобильная адаптация     | iPhone SE / Android 5" |
-| NF-05 | Работа без регистрации  | Полностью анонимно     |
+Нефункциональные требования MVP — в [MVP.md, раздел 3](MVP.md). Там же отмечено, что из этого уже сделано.
 
 ### 3.2 Целевое решение (Phase 2+)
 
@@ -94,43 +77,15 @@
 
 ### 4.1 MVP — Упрощённая
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    CLIENT (React SPA)                       │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  • Страница настроек (длительность, уровень, фокус)   │  │
-│  │  • Страница тренировки (таймер, поза, прогресс)       │  │
-│  │  • localStorage: последние настройки                  │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                          │ HTTPS
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  BACKEND (FastAPI, 1 сервис)                │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  GET  /api/poses              — каталог               │  │
-│  │  POST /api/workouts/generate  — генерация             │  │
-│  │  GET  /api/workouts/:id       — получение             │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-                          │
-          ┌───────────────┴───────────────┐
-          ▼                               ▼
-┌──────────────────────┐      ┌──────────────────────────┐
-│   PostgreSQL         │      │   TTS API + S3           │
-│ ┌──────────────────┐ │      │  • ElevenLabs / Yandex   │
-│ │ poses (30-50)    │ │      │  • Аудио кэшируется в S3 │
-│ └──────────────────┘ │      └──────────────────────────┘
-└──────────────────────┘
-```
+Схема того, как MVP устроен сейчас (frontend на nginx, backend, PostgreSQL, MinIO, Adminer), — в [MVP.md, раздел 4](MVP.md).
 
 **Упрощения MVP:**
 
 - Нет аутентификации
 - Нет User Service / Analytics Service
-- Нет Redis (кэш TTS — опционально)
-- Нет CDN (статика с бэкенда)
-- 1 таблица в БД (`poses`)
+- Нет Redis
+- Нет CDN
+- 1 таблица в БД (`poses`), миграции — сырые SQL-файлы
 
 ---
 
@@ -232,30 +187,7 @@ app/
 
 ### 5.1 MVP — 1 таблица
 
-```sql
-CREATE TABLE poses (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name_ru         VARCHAR(100) NOT NULL,
-    name_sanskrit   VARCHAR(100),
-    name_en         VARCHAR(100),
-
-    category        VARCHAR(50) NOT NULL,         -- warmup, standing, sitting, balancing, relaxation
-    difficulty      INTEGER NOT NULL CHECK (difficulty BETWEEN 1 AND 5),
-
-    focus_areas     TEXT[],                       -- ["back", "legs", "shoulders"]
-    contraindications TEXT[],                     -- ["wrist_injury", "high_blood_pressure"]
-
-    description     TEXT,
-    image_url       TEXT NOT NULL,
-    audio_url       TEXT,
-
-    created_at      TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_poses_category ON poses(category);
-CREATE INDEX idx_poses_difficulty ON poses(difficulty);
-CREATE INDEX idx_poses_focus ON poses USING GIN(focus_areas);
-```
+Фактическая схема таблицы `poses` и состав seed-данных — в [MVP.md, раздел 5](MVP.md).
 
 ### 5.2 Целевое решение — 5+ таблиц
 
@@ -323,48 +255,7 @@ CREATE TABLE pose_feedback (
 
 ## 6. Data Flow: Генерация тренировки (MVP)
 
-```
-1. Client → POST /api/workouts/generate
-   Body: { duration_min: 15, level: "beginner", focus: "back" }
-
-2. Backend (Workout Generator):
-   a. max_difficulty = {"beginner": 2, "intermediate": 3, "advanced": 5}[level]
-   b. Query PostgreSQL:
-      SELECT * FROM poses
-      WHERE difficulty <= max_difficulty
-        AND focus = ANY(@focus_areas)
-      ORDER BY random()
-   c. Расчёт количества поз: total_poses = (duration_min * 60) / (30 + 5)
-   d. Распределение по фазам: 20% warmup, 60% main, 20% cooldown
-   e. Подбор поз из candidate_poses по категориям
-
-3. TTS Service (async, опционально):
-   a. Проверка кэша: ключ = hash(pose_id + template)
-   b. Если нет → запрос к TTS API (ElevenLabs/Yandex)
-   c. Сохранение аудио в S3, обновление audio_url в кэше
-
-4. Response → Client:
-   {
-     "workout_id": "uuid",
-     "duration_sec": 900,
-     "poses": [
-       {
-         "pose_id": "uuid",
-         "name": "Поза ребёнка",
-         "image_url": "https://s3/...",
-         "audio_url": "https://s3/...",
-         "hold_seconds": 30,
-         "transition_seconds": 5,
-         "phase": "warmup"
-       }
-     ]
-   }
-
-5. Client:
-   - Сохранение тренировки в памяти
-   - Запуск интерфейса тренировки
-   - Воспроизведение TTS по таймеру
-```
+Формат запроса и ответа — в [MVP.md, раздел 6](MVP.md), логика генератора — в [разделе 7](MVP.md).
 
 ---
 
@@ -394,6 +285,12 @@ CREATE TABLE pose_feedback (
 
 ## 8. TTS-озвучка
 
+Шаблоны фраз и план интеграции — в [MVP.md, раздел 8](MVP.md).
+
+**Phase 2+:** кэш в S3 + Redis (TTL 30 дней), ключ `hash(pose_id + template_id + language)`, при недоступности TTS — текст на экране.
+
+---
+
 ### Шаблоны инструкций
 
 ```python
@@ -417,12 +314,15 @@ TTS_TEMPLATES = {
 
 ## 9. Roadmap
 
-### Phase 1: MVP Core — Ядро тренировки (1-2 недели)
+### Phase 1: MVP Core — Ядро тренировки
 
-- [ ] Seed каталога поз (30-50 асан) через SQL
-- [ ] Бэкенд: `/api/poses`, `/api/workouts/generate`
-- [ ] Фронтенд: страница настроек + тренировка
+Майлстоун [v0.0.1a](https://github.com/thehighestmath/down-dog/milestone/1).
+
+- [x] Seed каталога поз (54 асаны) через SQL
+- [x] Бэкенд: `/api/poses`, `/api/workouts/generate`, `/api/workouts/{id}`
+- [x] Фронтенд: страница настроек + тренировка
 - [ ] TTS интеграция (кэширование)
+- [ ] Логирование событий для метрик
 - [ ] Мобильная адаптация
 
 ### Phase 2: Пользователь и история (2-3 недели)
@@ -436,7 +336,6 @@ TTS_TEMPLATES = {
 
 - [ ] PWA (offline-режим)
 - [ ] Like/dislike поз
-- [ ] Пропуск/пауза
 - [ ] Выбор голоса TTS
 
 ### Phase 4: Scale (4+ недель)
@@ -452,12 +351,12 @@ TTS_TEMPLATES = {
 
 | Компонент      | MVP                              | Целевое решение (монолит)                  |
 | -------------- | -------------------------------- | ------------------------------------------ |
-| **Frontend**   | React 18, TS, Tailwind, Zustand  | + PWA, Service Worker                      |
-| **Backend**    | Python 3.11, FastAPI (1 сервис)  | FastAPI (монолит, 6 модулей)               |
-| **Database**   | PostgreSQL 15 (1 таблица)        | PostgreSQL 15 (5+ таблиц) + Redis 7        |
+| **Frontend**   | React 19, TS, Vite, nginx        | + PWA, Service Worker                      |
+| **Backend**    | Python 3.14, FastAPI (1 сервис)  | FastAPI (монолит, 6 модулей)               |
+| **Database**   | PostgreSQL 16 (1 таблица)        | PostgreSQL 16 (5+ таблиц) + Redis 7        |
 | **Storage**    | S3 (MinIO локально, AWS в проде) | S3 + CDN (CloudFront/Cloudflare)           |
 | **TTS**        | ElevenLabs / Yandex SpeechKit    | + кэширование (Redis, TTL 30 дней)         |
-| **Infra**      | Docker Compose (2 контейнера)    | Docker Compose / K8s (опционально) + Nginx |
+| **Infra**      | Docker Compose (6 сервисов)      | Docker Compose / K8s (опционально) + Nginx |
 | **CI/CD**      | GitHub Actions                   | GitHub Actions + auto-deploy               |
 | **Monitoring** | —                                | Prometheus + Grafana (опционально)         |
 
@@ -523,9 +422,4 @@ def generate_workout(duration, level, focus, user_id=None):
 
 ## 13. Метрики успеха MVP
 
-| Метрика                               | Цель        |
-| ------------------------------------- | ----------- |
-| Завершённых тренировок / начатых      | > 70%       |
-| Повторных сессий (возвраты за неделю) | > 30%       |
-| Средняя длительность тренировки       | > 10 минут  |
-| Время до первой тренировки            | < 30 секунд |
+См. [MVP.md, раздел 12](MVP.md).
