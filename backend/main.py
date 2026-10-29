@@ -1,12 +1,18 @@
 import logging
 import os
+import re
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import cache
+from typing import Any
 
+import boto3
+from botocore.exceptions import ClientError
 from database import get_db_connection
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
 
@@ -72,6 +78,33 @@ app.add_middleware(
 
 workouts: dict[str, dict] = {}
 
+# -----------------------------------------
+# S3 (MinIO): озвучка
+# -----------------------------------------
+
+
+AUDIO_LANGS = {"ru", "en"}
+AUDIO_KINDS = {"poses", "phrases", "numbers"}
+AUDIO_NAME_RE = re.compile(r"[a-z0-9_]+")
+
+
+@cache
+def get_s3() -> Any:
+    return boto3.client(
+        "s3",
+        endpoint_url=os.environ["MINIO_ENDPOINT"],
+        aws_access_key_id=os.environ["ACCESS_KEY"],
+        aws_secret_access_key=os.environ["SECRET_KEY"],
+        region_name="us-east-1",
+    )
+
+
+def audio_name(name_en: str, audio_url: str | None) -> str:
+    if audio_url:
+        return os.path.basename(audio_url).removesuffix(".mp3")
+    name = name_en.lower().replace("'", "").replace(" pose", "")
+    return re.sub(r"[^a-z0-9]+", "_", name).strip("_")
+
 
 # -----------------------------------------
 # Вспомогательная функция: загрузка поз из БД
@@ -90,7 +123,10 @@ def load_poses_from_db() -> list[dict]:
                 "FROM poses ORDER BY id"
             )
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            poses = [dict(row) for row in rows]
+            for pose in poses:
+                pose["audio_name"] = audio_name(pose["name_en"], pose["audio_url"])
+            return poses
     finally:
         conn.close()
 
@@ -220,3 +256,27 @@ def get_workout(workout_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Тренировка не найдена")
 
     return workout
+
+
+@app.get("/api/audio/{lang}/{kind}/{name}")
+def get_audio(lang: str, kind: str, name: str) -> StreamingResponse:
+    if (
+        lang not in AUDIO_LANGS
+        or kind not in AUDIO_KINDS
+        or not AUDIO_NAME_RE.fullmatch(name)
+    ):
+        raise HTTPException(status_code=404, detail="Аудио не найдено")
+
+    key = f"audio/{kind}_{lang}/{name}.mp3"
+    try:
+        obj = get_s3().get_object(Bucket=os.environ["BUCKET_NAME"], Key=key)
+    except ClientError as e:
+        if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
+            raise HTTPException(status_code=404, detail="Аудио не найдено") from e
+        raise
+
+    return StreamingResponse(
+        obj["Body"].iter_chunks(),
+        media_type="audio/mpeg",
+        headers={"Content-Length": str(obj["ContentLength"])},
+    )
