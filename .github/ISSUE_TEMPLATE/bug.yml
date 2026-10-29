@@ -1,0 +1,40 @@
+name: Баг
+description: Что-то работает не так, как должно
+title: 'fix: '
+labels: ['bug']
+body:
+  - type: textarea
+    id: steps
+    attributes:
+      label: Как воспроизвести
+      description: Шаги, по которым баг повторит любой из команды.
+      placeholder: |
+        1. docker compose up
+        2. Открыть /workout, выбрать уровень «Новичок»
+        3. Нажать «Начать»
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидалось
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Что происходит на самом деле
+      description: Текст ошибки, логи, скриншот.
+    validations:
+      required: true
+
+  - type: input
+    id: where
+    attributes:
+      label: Где
+      description: Ветка или коммит, браузер, локально или в Docker.
+      placeholder: master @ 9bb29a7, Chrome, docker compose
+    validations:
+      required: false
