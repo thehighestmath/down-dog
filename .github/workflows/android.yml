@@ -1,0 +1,46 @@
+name: Android
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Lint + unit tests + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The Gradle daemon needs JDK 25, see android/gradle/gradle-daemon-jvm.properties
+      - name: Set up JDK
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Caches Gradle and validates the checked-in gradle-wrapper.jar
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      - name: Lint, unit tests, build
+        run: |
+          echo "ЧТО: Android Lint, юнит-тесты (app/src/test) и сборка debug APK."
+          echo "ЗАЧЕМ: lint ловит ошибки Android API и ресурсов, тесты - сломанную логику"
+          echo "       таймера и плейлиста, а то, что не собирается, нельзя поставить на телефон."
+          if ! ./gradlew --console=plain lintDebug testDebugUnitTest assembleDebug; then
+            echo "::error title=android::Android-приложение не прошло проверку, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: найдите в логе первую строку с 'FAILED' или 'e: file://...'."
+            echo "  Локально: cd android && ./gradlew lintDebug testDebugUnitTest assembleDebug"
+            echo "  (или в Android Studio: Build > Make Project, Code > Inspect Code)"
+            exit 1
+          fi
