@@ -5,3 +5,8 @@
 *.jpg binary
 *.jpeg binary
 *.ico binary
+
+# Windows batch scripts (android/gradlew.bat) break with LF
+*.bat text eol=crlf
+*.jar binary
+*.webp binary

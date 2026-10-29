@@ -26,6 +26,17 @@ updates:
       npm:
         patterns: ['*']
 
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: weekly
+    # wait a week after a release: hijacked releases are usually caught by then
+    cooldown:
+      default-days: 7
+    groups:
+      gradle:
+        patterns: ['*']
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

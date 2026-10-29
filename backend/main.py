@@ -4,8 +4,9 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import storage
 from database import get_db_connection
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
@@ -220,3 +221,25 @@ def get_workout(workout_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Тренировка не найдена")
 
     return workout
+
+
+# =========================================
+# GET /api/images/{name}
+# =========================================
+
+
+@app.get("/api/images/{name}")
+def get_image(name: str) -> Response:
+    """Картинка позы из MinIO. Ссылки на неё лежат в poses.image_url."""
+    image = storage.get_image(name)
+
+    if image is None:
+        raise HTTPException(status_code=404, detail="Картинка не найдена")
+
+    content, content_type = image
+    # Картинки не меняются, пусть браузер и приложение кэшируют их на сутки
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )

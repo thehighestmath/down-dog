@@ -55,6 +55,7 @@ down-dog/
 │   └── sql/              миграции и seed-данные
 ├── frontend/             React + TypeScript + Vite, в контейнере — nginx
 │   └── src/components/   экраны: HomeScreen, Player, FinishedScreen
+├── android/              Android-приложение: Kotlin + Jetpack Compose
 ├── s3/                   разовая задача: создаёт бакет и заливает картинки в MinIO
 ├── Images/               картинки поз
 ├── scripts/              смоук-тест стека, проверка сообщений коммитов
@@ -111,11 +112,33 @@ npm run dev
 
 Откройте http://localhost:5173. Запросы к `/api` Vite проксирует на `http://localhost:8000`, так что backend должен быть запущен (в Docker или локально).
 
+### Android
+
+Нужна [Android Studio](https://developer.android.com/studio): в ней есть JDK, Android SDK и эмулятор. При первом запуске пройдите мастер настройки (Standard), затем создайте эмулятор в Device Manager.
+
+1. **File → Open** → папка `android/` (не корень репозитория). Дождитесь окончания Gradle Sync.
+2. Запустите backend (в Docker или локально).
+3. Выберите эмулятор и нажмите **Run ▶**.
+
+Приложение ходит в API по адресу `http://10.0.2.2:8000/` — так эмулятор видит `localhost` компьютера. Для телефона или другого порта укажите адрес в `android/local.properties` (файл не коммитится) и пересоберите:
+
+```properties
+downdog.apiUrl=http://192.168.1.10:8000/
+```
+
+Телефон и компьютер должны быть в одной Wi-Fi сети. Код экранов — в `android/app/src/main/java/.../ui/`, логика таймера — в `WorkoutViewModel.kt`.
+
 ## Тесты и проверки
 
 ```bash
 pytest                      # из корня репозитория
 pre-commit run --all-files  # все линтеры и форматтеры, как в CI
+```
+
+Android (из папки `android/`, то же запускает CI):
+
+```bash
+./gradlew lintDebug testDebugUnitTest assembleDebug
 ```
 
 Один раз после клонирования поставьте хуки, чтобы проверки запускались на каждом `git commit`:
