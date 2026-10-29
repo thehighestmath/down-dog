@@ -5,6 +5,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -12,8 +16,6 @@ COPY . .
 
 EXPOSE 8000
 
-# Run as an unprivileged user: if the app is compromised, the attacker
-# does not get root inside the container
 RUN useradd --no-log-init --no-create-home --uid 10001 app
 USER 10001
 
