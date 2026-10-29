@@ -546,23 +546,54 @@ pre-commit install --hook-type commit-msg
 pre-commit validate-config
 ```
 
-# Документация по запуску проекта через Docker-compose
+# Запуск проекта через Docker Compose
 
-В начале запускаем Docker(На панели задач должна быть иконка)
+Запускайте команды из корневой папки репозитория. Перед запуском убедитесь, что Docker Desktop запущен.
 
-Потом в CMD вводим команду запуска
+Проверьте конфигурацию и соберите/запустите все сервисы:
 
 ```bash
-docker compose up -d --build
+docker compose config
+docker compose up --build -d
+docker compose ps
 ```
 
-Команда остановки
+Проверка доступных адресов:
+
+- Frontend: [http://localhost:3000](http://localhost:3000)
+- Backend API: [http://localhost:8000](http://localhost:8000)
+- Swagger: [http://localhost:8000/docs](http://localhost:8000/docs)
+- Backend healthcheck: [http://localhost:8000/health](http://localhost:8000/health)
+- Adminer: [http://localhost:8080](http://localhost:8080)
+- MinIO console: [http://localhost:9001](http://localhost:9001)
+
+## Как выполняются миграции
+
+1. Сервис `db` запускается и проходит проверку готовности PostgreSQL.
+2. Одноразовый сервис `migrate` запускает `backend/migrate.py` и применяет SQL-файлы из `backend/sql/` в алфавитном порядке.
+3. Таблица `schema_migrations` хранит имя каждого применённого файла, его SHA-256 checksum и время применения. Уже применённые файлы повторно не запускаются.
+4. Сервис `backend` стартует только после успешного завершения `migrate`. Если миграция завершается с ошибкой или checksum изменённого ранее файла не совпадает, backend не запускается.
+5. Endpoint `GET /health` проверяет соединение с PostgreSQL запросом `SELECT 1`. Docker Compose использует его как healthcheck; frontend ждёт, пока backend станет healthy.
+
+**Важно: применённые SQL-файлы нельзя редактировать или переименовывать.** Если нужно изменить схему или seed-данные, создайте следующий файл, например `backend/sql/03_add_pose_metadata.sql`. Изменение уже применённого файла приведёт к ошибке checksum — это защита от незаметного изменения истории миграций.
+
+## Логи и остановка
+
+Просмотреть логи миграций и backend:
+
+```bash
+docker compose logs -f migrate
+docker compose logs -f backend
+```
+
+Остановить сервисы, сохранив данные в volumes:
 
 ```bash
 docker compose down
 ```
 
-Если не работает, поменяйте образ minio
+Команда `docker compose down -v` дополнительно удаляет volumes PostgreSQL и MinIO вместе с сохранёнными данными; используйте её только если действительно хотите сбросить локальную базу и файлы.
+
 
 # Документация по работе с Adminer (GUI базы данных)
 

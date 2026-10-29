@@ -1,5 +1,3 @@
-import logging
-import os
 import uuid
 
 from database import get_db_connection
@@ -7,57 +5,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
-
-logger = logging.getLogger("app")
-
-
-def init_db() -> None:
-    sql_dir = os.path.join(BASE_DIR, "sql")
-
-    if not os.path.isdir(sql_dir):
-        raise FileNotFoundError(f"Папка миграций не найдена: {sql_dir}")
-
-    sql_files = sorted(
-        file_name for file_name in os.listdir(sql_dir) if file_name.endswith(".sql")
-    )
-
-    if not sql_files:
-        raise RuntimeError(f"В папке {sql_dir} нет SQL-файлов")
-
-    conn = None
-
-    try:
-        conn = get_db_connection()
-
-        with conn.cursor() as cursor:
-            for file_name in sql_files:
-                file_path = os.path.join(sql_dir, file_name)
-                logger.info("Выполнение SQL-файла: %s", file_name)
-
-                with open(file_path, encoding="utf-8") as sql_file:
-                    cursor.execute(sql_file.read())
-
-        conn.commit()
-        logger.info("Инициализация базы данных завершена")
-
-    except Exception:
-        if conn is not None:
-            conn.rollback()
-
-        logger.exception("Ошибка инициализации базы данных")
-        raise
-
-    finally:
-        if conn is not None:
-            conn.close()
-
 
 app = FastAPI()
 
@@ -68,6 +15,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+def health_check() -> dict[str, str]:
+    conn = None
+
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Database is unavailable") from exc
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 # -----------------------------------------

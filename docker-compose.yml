@@ -1,3 +1,10 @@
+x-db-env: &db-env
+  POSTGRES_HOST: db
+  POSTGRES_PORT: '5432'
+  POSTGRES_DB: app_db
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+
 services:
   backend:
     build: ./backend
@@ -5,18 +12,12 @@ services:
     ports:
       - '8000:8000'
     environment:
-      - PYTHONUNBUFFERED=1
-      - MINIO_ENDPOINT=http://minio:9000
-      - ACCESS_KEY=minioadmin
-      - SECRET_KEY=minioadmin
-      - BUCKET_NAME=down-dog
-
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=app_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/app_db
+      <<: *db-env
+      PYTHONUNBUFFERED: '1'
+      MINIO_ENDPOINT: http://minio:9000
+      ACCESS_KEY: minioadmin
+      SECRET_KEY: minioadmin
+      BUCKET_NAME: down-dog
     depends_on:
       minio:
         condition: service_healthy
@@ -24,24 +25,26 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - app-network
     restart: unless-stopped
 
   migrate:
-    build:
-      context: ./backend
-      dockerfile: dockerfilemigrations
-    container_name: app-migrations
+    build: ./backend
     command: ['python', 'migrate.py']
     environment:
-      - PYTHONUNBUFFERED=1
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=app_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/app_db
+      <<: *db-env
+      PYTHONUNBUFFERED: '1'
     depends_on:
       db:
         condition: service_healthy
@@ -55,7 +58,8 @@ services:
     ports:
       - '3000:8080'
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
@@ -118,10 +122,10 @@ services:
       dockerfile: s3/Dockerfile
     container_name: down-dog-s3
     environment:
-      - MINIO_ENDPOINT=http://minio:9000
-      - ACCESS_KEY=minioadmin
-      - SECRET_KEY=minioadmin
-      - BUCKET_NAME=down-dog
+      MINIO_ENDPOINT: http://minio:9000
+      ACCESS_KEY: minioadmin
+      SECRET_KEY: minioadmin
+      BUCKET_NAME: down-dog
     depends_on:
       minio:
         condition: service_healthy

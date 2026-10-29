@@ -1,7 +1,9 @@
 import hashlib
 import logging
 import sys
+from collections.abc import Mapping
 from pathlib import Path
+from typing import cast
 
 from database import get_db_connection
 
@@ -55,10 +57,10 @@ def run_migrations() -> None:
                         """,
                         (filename,),
                     )
-                    row = cursor.fetchone()
+                    row = cast(Mapping[str, str] | None, cursor.fetchone())
 
                     if row is not None:
-                        if row["checksum"] != checksum:  # type: ignore
+                        if row["checksum"] != checksum:
                             raise RuntimeError(
                                 f"Миграция {filename} была изменена "
                                 "после применения. Создай новую миграцию."
