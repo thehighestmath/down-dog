@@ -10,6 +10,10 @@ name: Project automation
 #
 # assignees: вешает метку multiple-assignees на issue, у которых больше одного
 # исполнителя, и снимает её, когда исполнитель остался один.
+#
+# deadline: вешает метку overdue на открытые issue, у которых поле "Дедлайн"
+# уже прошло, и снимает её, когда дедлайн перенесли вперёд, убрали или задачу
+# закрыли.
 
 on:
   schedule:
@@ -169,6 +173,83 @@ jobs:
               if ! gh label list -R "$repo" --limit 500 --json name --jq '.[].name' | grep -Fxq "$LABEL"; then
                 gh label create "$LABEL" -R "$repo" --color d93f0b \
                   --description "У задачи должен быть один исполнитель"
+              fi
+              gh issue edit "$number" -R "$repo" --add-label "$LABEL" >/dev/null
+            else
+              gh issue edit "$number" -R "$repo" --remove-label "$LABEL" >/dev/null
+            fi
+            echo "$repo#$number: $action $LABEL" | tee -a "$GITHUB_STEP_SUMMARY"
+          done <<<"$changes"
+
+  deadline:
+    name: Label overdue issues
+    runs-on: ubuntu-latest
+    env:
+      # Для меток PAT нужен ещё и scope repo
+      GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+      OWNER: thehighestmath
+      PROJECT_NUMBER: 5
+      LABEL: overdue
+      TZ: Europe/Moscow
+    steps:
+      - name: Sync overdue label
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error title=PROJECT_TOKEN::Не задан секрет PROJECT_TOKEN (classic PAT со scope project и repo)"
+            exit 1
+          fi
+          today=$(date +%F)
+          export TODAY="$today"
+
+          # Строки "<repo>\t<номер>\t<add|remove>" для задач с полем "Дедлайн".
+          # Метку overdue вешаем, когда дедлайн уже прошёл (deadline < today)
+          # и задача ещё открыта; снимаем во всех остальных случаях - когда дедлайн
+          # перенесли вперёд, убрали, или задачу закрыли.
+          # $-переменные в одинарных кавычках - переменные GraphQL и jq, не shell
+          # shellcheck disable=SC2016
+          changes=$(gh api graphql --paginate \
+            -f login="$OWNER" -F number="$PROJECT_NUMBER" \
+            -f query='
+              query($login: String!, $number: Int!, $endCursor: String) {
+                user(login: $login) {
+                  projectV2(number: $number) {
+                    items(first: 100, after: $endCursor) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes {
+                        content {
+                          ... on Issue {
+                            number
+                            repository { nameWithOwner }
+                            state
+                            labels(first: 100) { nodes { name } }
+                          }
+                        }
+                        deadline: fieldValueByName(name: "Дедлайн") {
+                          ... on ProjectV2ItemFieldDateValue { date }
+                        }
+                      }
+                    }
+                  }
+                }
+              }' \
+            --jq '.data.user.projectV2.items.nodes[]
+              | select(.content.number != null)
+              | .content as $c
+              | (.deadline.date // null) as $deadline
+              | ($c.state == "OPEN" and $deadline != null and $deadline < env.TODAY) as $overdue
+              | ([$c.labels.nodes[].name] | index(env.LABEL) != null) as $labeled
+              | if $overdue and ($labeled | not) then [$c.repository.nameWithOwner, $c.number, "add"]
+                elif $labeled and ($overdue | not) then [$c.repository.nameWithOwner, $c.number, "remove"]
+                else empty end
+              | @tsv')
+
+          while IFS=$'\t' read -r repo number action; do
+            [ -n "$repo" ] || continue
+            if [ "$action" = add ]; then
+              if ! gh label list -R "$repo" --limit 500 --json name --jq '.[].name' | grep -Fxq "$LABEL"; then
+                gh label create "$LABEL" -R "$repo" --color d93f0b \
+                  --description "Deadline in the project has passed"
               fi
               gh issue edit "$number" -R "$repo" --add-label "$LABEL" >/dev/null
             else
