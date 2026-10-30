@@ -9,7 +9,6 @@ services:
   backend:
     build: ./backend
     container_name: app-backend
-    ports: !reset []
     environment:
       <<: *db-env
       CORS_ORIGINS: ${CORS_ORIGINS}
@@ -66,7 +65,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports: !reset []
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -78,9 +76,6 @@ services:
       - app-network
     restart: unless-stopped
 
-  adminer:
-    profiles: ['disabled']
-
   minio:
     image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     container_name: down-dog-minio
@@ -88,7 +83,6 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports: !reset []
     volumes:
       - minio_data:/data
     healthcheck:
