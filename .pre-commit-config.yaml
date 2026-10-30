@@ -1,3 +1,4 @@
+# Keep this file ASCII-only on Windows pre-commit.txt
 # Keep this file ASCII-only: on Windows pre-commit reads it with the
 # system codepage and crashes on Cyrillic.
 #
