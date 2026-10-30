@@ -1,0 +1,66 @@
+name: PR linked issue
+
+# Вешает на ПР метку no-linked-issue, если к нему не залинкована ни одна
+# задача (issue), и снимает её, когда связь появляется.
+#
+# "Залинкована" = официальная связь из dev-панели GitHub (closingIssuesReferences):
+# создаётся по ключевым словам в описании ПР ("Closes #N", "Part of #N",
+# "Fixes #N") или вручную через панель Linked issues. Это ровно то, о чём
+# просит PR-темплейт (https://github.com/thehighestmath/down-dog/blob/master/.github/pull_request_template.md).
+#
+# Метка информационная: проверку она не блокирует, просто подсвечивает ПР,
+# который стоит связать с задачей перед мержем.
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, ready_for_review]
+
+permissions:
+  pull-requests: write
+
+concurrency:
+  group: pr-linked-issue-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  check-linked-issue:
+    name: Label PRs without a linked issue
+    runs-on: ubuntu-latest
+    env:
+      OWNER: thehighestmath
+      REPO: down-dog
+      LABEL: no-linked-issue
+      LABEL_COLOR: d93f0b
+    steps:
+      - name: Sync no-linked-issue label
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          # $-переменные в одинарных кавычках ниже - переменные GraphQL и jq, не shell
+          # shellcheck disable=SC2016
+          count=$(gh api graphql \
+            -f owner="$OWNER" -f repo="$REPO" -F number="$PR_NUMBER" \
+            -f query='
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    closingIssuesReferences(first: 50) { totalCount }
+                  }
+                }
+              }' \
+            --jq '.data.repository.pullRequest.closingIssuesReferences.totalCount')
+
+          if [ "$count" -eq 0 ]; then
+            if ! gh label list -R "$OWNER/$REPO" --limit 500 --json name --jq '.[].name' | grep -Fxq "$LABEL"; then
+              gh label create "$LABEL" -R "$OWNER/$REPO" --color "$LABEL_COLOR" \
+                --description "PR has no linked issue/task" >/dev/null
+            fi
+            gh pr edit "$PR_NUMBER" -R "$OWNER/$REPO" --add-label "$LABEL" >/dev/null
+            echo "PR #$PR_NUMBER: нет залинкованного issue, добавлена метка $LABEL"
+          else
+            gh pr edit "$PR_NUMBER" -R "$OWNER/$REPO" --remove-label "$LABEL" >/dev/null \
+              || true
+            echo "PR #$PR_NUMBER: issue залинковано, метка $LABEL снята"
+          fi
