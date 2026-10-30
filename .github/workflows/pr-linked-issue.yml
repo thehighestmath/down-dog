@@ -27,6 +27,7 @@ jobs:
     name: Label PRs without a linked issue
     runs-on: ubuntu-latest
     env:
+      GH_TOKEN: ${{ github.token }}
       OWNER: thehighestmath
       REPO: down-dog
       LABEL: no-linked-issue
