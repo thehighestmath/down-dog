@@ -1,0 +1,126 @@
+x-db-env: &db-env
+  POSTGRES_HOST: db
+  POSTGRES_PORT: '5432'
+  POSTGRES_DB: ${POSTGRES_DB}
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+services:
+  backend:
+    build: ./backend
+    container_name: app-backend
+    ports: !reset []
+    environment:
+      <<: *db-env
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      PYTHONUNBUFFERED: '1'
+      MINIO_ENDPOINT: http://minio:9000
+      ACCESS_KEY: ${MINIO_ROOT_USER}
+      SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      BUCKET_NAME: ${BUCKET_NAME}
+    depends_on:
+      minio:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '--max-time', '3', 'http://127.0.0.1:8000/health']
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  migrate:
+    build: ./backend
+    command: ['python', 'migrate.py']
+    environment:
+      <<: *db-env
+      PYTHONUNBUFFERED: '1'
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: 'no'
+
+  frontend:
+    build: ./frontend
+    container_name: app-frontend
+    ports:
+      - '3000:8080'
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: app-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports: !reset []
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  adminer:
+    profiles: ["disabled"]
+
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    container_name: down-dog-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports: !reset []
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:9000/minio/health/live || exit 1']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  s3:
+    build:
+      context: .
+      dockerfile: s3/Dockerfile
+    container_name: down-dog-s3
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      ACCESS_KEY: ${MINIO_ROOT_USER}
+      SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      BUCKET_NAME: ${BUCKET_NAME}
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: 'no'
+
+volumes:
+  minio_data:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
