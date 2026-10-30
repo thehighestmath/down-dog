@@ -24,6 +24,9 @@ repos:
         # .bat files must stay CRLF, see .gitattributes
         exclude: \.bat$
       - id: check-yaml
+        # docker-compose.prod.yml uses Compose-specific tags (!reset, !override);
+        # --unsafe makes the parser skip unknown tags instead of failing.
+        args: [--unsafe]
       - id: check-toml
       - id: check-json
         # tsconfig*.json is JSON with comments

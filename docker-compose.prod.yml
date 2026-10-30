@@ -79,7 +79,7 @@ services:
     restart: unless-stopped
 
   adminer:
-    profiles: ["disabled"]
+    profiles: ['disabled']
 
   minio:
     image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
