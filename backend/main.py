@@ -1,61 +1,13 @@
-import logging
-import os
 import uuid
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 
+import storage
 from database import get_db_connection
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
-logger = logging.getLogger("app")
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-def init_db() -> None:
-    sql_dir = os.path.join(BASE_DIR, "sql")
-
-    if not os.path.exists(sql_dir):
-        logger.warning("Папка миграций НЕ найдена по пути: %s", sql_dir)
-        return
-
-    sql_files = sorted([f for f in os.listdir(sql_dir) if f.endswith(".sql")])
-
-    if not sql_files:
-        logger.warning("В папке %s не найдено .sql файлов", sql_dir)
-        return
-
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cursor:
-            for file_name in sql_files:
-                file_path = os.path.join(sql_dir, file_name)
-                logger.info("Применение миграции: %s", file_name)
-
-                with open(file_path, encoding="utf-8") as f:
-                    cursor.execute(f.read())
-
-        conn.commit()
-        conn.close()
-        logger.info("Все миграции PostgreSQL успешно применены!")
-
-    except Exception as e:
-        logger.error("Ошибка при применении миграции: %s", e, exc_info=True)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    init_db()
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
@@ -64,6 +16,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+def health_check() -> dict[str, str]:
+    conn = None
+
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        return {"status": "ok"}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Database is unavailable") from exc
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 # -----------------------------------------
@@ -220,3 +188,25 @@ def get_workout(workout_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Тренировка не найдена")
 
     return workout
+
+
+# =========================================
+# GET /api/images/{name}
+# =========================================
+
+
+@app.get("/api/images/{name}")
+def get_image(name: str) -> Response:
+    """Картинка позы из MinIO. Ссылки на неё лежат в poses.image_url."""
+    image = storage.get_image(name)
+
+    if image is None:
+        raise HTTPException(status_code=404, detail="Картинка не найдена")
+
+    content, content_type = image
+    # Картинки не меняются, пусть браузер и приложение кэшируют их на сутки
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
