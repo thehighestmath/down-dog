@@ -2,6 +2,7 @@ package io.github.thehighestmath.downdog.ui
 
 import io.github.thehighestmath.downdog.data.DownDogApi
 import io.github.thehighestmath.downdog.data.GenerateWorkoutRequest
+import io.github.thehighestmath.downdog.data.OfflineStore
 import io.github.thehighestmath.downdog.data.Pose
 import io.github.thehighestmath.downdog.data.Workout
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,7 @@ class WorkoutViewModelTest {
         ),
         private val workoutPoses: List<String> = listOf("A", "B"),
         private val failPoses: Boolean = false,
+        private val failGenerate: Boolean = false,
     ) : DownDogApi {
         var lastRequest: GenerateWorkoutRequest? = null
 
@@ -43,10 +45,26 @@ class WorkoutViewModelTest {
 
         override suspend fun generateWorkout(request: GenerateWorkoutRequest): Workout {
             lastRequest = request
+            if (failGenerate) throw IOException("offline")
             return Workout("id-1", request.durationMin, request.level, request.focus, workoutPoses)
         }
 
         override suspend fun getWorkout(id: String): Workout = error("not used")
+    }
+
+    private class FakeStore(
+        var savedCatalog: List<Pose> = emptyList(),
+        val savedWorkouts: MutableList<Workout> = mutableListOf(),
+    ) : OfflineStore {
+        override suspend fun catalog() = savedCatalog
+
+        override suspend fun saveCatalog(poses: List<Pose>) {
+            savedCatalog = poses
+        }
+
+        override suspend fun workouts() = savedWorkouts.toList()
+
+        override suspend fun saveWorkout(workout: Workout) = savedWorkouts.add(0, workout).let { }
     }
 
     @Before
@@ -56,7 +74,7 @@ class WorkoutViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     private fun TestScope.readyViewModel(api: FakeApi = FakeApi()): WorkoutViewModel {
-        val vm = WorkoutViewModel(api)
+        val vm = WorkoutViewModel(api, FakeStore())
         vm.generate()
         runCurrent()
         return vm
@@ -65,7 +83,7 @@ class WorkoutViewModelTest {
     @Test
     fun `generate sends selected settings`() = runTest(dispatcher) {
         val api = FakeApi()
-        val vm = WorkoutViewModel(api)
+        val vm = WorkoutViewModel(api, FakeStore())
         vm.setDuration(20)
         vm.setLevel(Level.ADVANCED)
         vm.setFocus(Focus.LEGS)
@@ -87,7 +105,7 @@ class WorkoutViewModelTest {
 
     @Test
     fun `catalog failure shows error`() = runTest(dispatcher) {
-        val vm = WorkoutViewModel(FakeApi(failPoses = true))
+        val vm = WorkoutViewModel(FakeApi(failPoses = true), FakeStore())
         runCurrent()
 
         assertTrue(vm.state.value.error!!.startsWith("Не удалось загрузить позы"))
@@ -168,5 +186,50 @@ class WorkoutViewModelTest {
         vm.start()
 
         assertEquals(Screen.HOME, vm.state.value.screen)
+    }
+
+    @Test
+    fun `generated workout and catalog are saved for offline`() = runTest(dispatcher) {
+        val store = FakeStore()
+        val vm = WorkoutViewModel(FakeApi(), store)
+        vm.generate()
+        runCurrent()
+
+        assertEquals(listOf("A", "B"), store.savedCatalog.map { it.nameEn })
+        assertEquals(listOf(vm.state.value.workout), store.savedWorkouts)
+    }
+
+    @Test
+    fun `offline catalog comes from the phone`() = runTest(dispatcher) {
+        val store = FakeStore(savedCatalog = listOf(Pose(id = 1, nameRu = "Поза А", nameEn = "A")))
+        val vm = WorkoutViewModel(FakeApi(failPoses = true), store)
+        runCurrent()
+
+        assertEquals(setOf("A"), vm.state.value.catalog.keys)
+        assertNull(vm.state.value.error)
+    }
+
+    @Test
+    fun `offline generate shows saved workout with the same settings`() = runTest(dispatcher) {
+        val matching = Workout("saved", 15, "beginner", "full_body", listOf("A"))
+        val other = Workout("other", 30, "beginner", "full_body", listOf("B"))
+        val store = FakeStore(savedWorkouts = mutableListOf(other, matching))
+        val vm = WorkoutViewModel(FakeApi(failGenerate = true), store)
+        vm.generate()
+        runCurrent()
+
+        assertEquals(matching, vm.state.value.workout)
+        assertNotNull(vm.state.value.notice)
+        assertNull(vm.state.value.error)
+    }
+
+    @Test
+    fun `offline generate without saved workout shows error`() = runTest(dispatcher) {
+        val vm = WorkoutViewModel(FakeApi(failGenerate = true), FakeStore())
+        vm.generate()
+        runCurrent()
+
+        assertNull(vm.state.value.workout)
+        assertTrue(vm.state.value.error!!.contains("Сохранённых тренировок"))
     }
 }

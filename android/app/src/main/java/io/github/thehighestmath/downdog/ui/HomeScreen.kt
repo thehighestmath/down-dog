@@ -48,6 +48,7 @@ fun HomeScreen(
         }
 
         state.error?.let { ErrorCard(it) }
+        state.notice?.let { NoticeCard(it) }
 
         OptionGroup("Длительность", DURATIONS_MIN, state.durationMin, { "$it мин" }, onDurationChange)
         OptionGroup("Уровень", Level.entries, state.level, { it.label }, onLevelChange)
@@ -98,6 +99,19 @@ private fun ErrorCard(message: String) {
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(message, modifier = Modifier.padding(16.dp))
+    }
+}
+
+@Composable
+private fun NoticeCard(message: String) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {

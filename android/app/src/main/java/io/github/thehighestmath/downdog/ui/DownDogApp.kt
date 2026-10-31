@@ -7,11 +7,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.thehighestmath.downdog.BuildConfig
+import io.github.thehighestmath.downdog.data.FileOfflineStore
 
 /** Корневой экран: настройки → тренировка → финиш, как в веб-версии. */
 @Composable
-fun DownDogApp(viewModel: WorkoutViewModel = viewModel()) {
+fun DownDogApp(
+    viewModel: WorkoutViewModel = viewModel {
+        val app = checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
+        WorkoutViewModel(store = FileOfflineStore(app.filesDir))
+    },
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -20,6 +28,12 @@ fun DownDogApp(viewModel: WorkoutViewModel = viewModel()) {
             .padding(innerPadding)
         val playlist = state.playlist
         val workout = state.workout
+
+        // Пока пользователь смотрит на сгенерированную трениров ку, качаем её картинки
+        val imageUrls = workout?.poses.orEmpty().mapNotNull { name ->
+            state.catalog[name]?.imageUrlFor(BuildConfig.API_BASE_URL)
+        }
+        PrefetchImages(imageUrls)
 
         when {
             state.screen == Screen.PLAYER && playlist != null -> PlayerScreen(
