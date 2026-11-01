@@ -4,6 +4,8 @@ import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
 import { useWakeLock } from '../useWakeLock'
 
+const LANG: AudioLang = AudioLang.Ru
+
 interface PlayerProps {
   workout: Workout
   poses: Pose[]
@@ -82,7 +84,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       setRunning(false)
       onFinish()
     }
-  }, [elapsed, totalSec, onFinish])
+  }, [elapsed, totalSec, onFinish, audio])
 
   // Текущая поза
   let acc = 0
@@ -101,6 +103,24 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       timeInPose = d
     }
   }
+
+  useEffect(() => {
+    const item = playlist[currentIdx]
+    if (!item || finishedRef.current) return
+    audio.play(poseIntroUrls(item, currentIdx === 0, LANG))
+  }, [currentIdx, playlist, audio])
+
+  useEffect(() => {
+    if (running) audio.resume()
+    else audio.pause()
+  }, [running, audio])
+
+  const poseDuration = playlist[currentIdx]?.duration ?? 0
+  useEffect(() => {
+    if (running && poseDuration >= 30 && timeInPose === Math.floor(poseDuration / 2)) {
+      audio.play([phraseUrl(LANG, Phrase.Breathe)])
+    }
+  }, [timeInPose, poseDuration, running, audio])
 
   const current = playlist[currentIdx]
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0

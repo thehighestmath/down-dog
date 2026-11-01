@@ -10,6 +10,7 @@ export interface Pose {
   description: string | null
   image_url: string | null
   audio_url: string | null
+  audio_name: string
   hold_time_sec: number | null
   full_cycle_sec: number | null
 }

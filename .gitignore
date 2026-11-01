@@ -253,6 +253,3 @@ dist-ssr
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
-.vscode/
-.idea/
