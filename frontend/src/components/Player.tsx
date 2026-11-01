@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
+import { beep, unlockBeep } from '../beep'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
 
 const LANG: AudioLang = AudioLang.Ru
+const BEEP_SECONDS = 3
 
 interface PlayerProps {
   workout: Workout
@@ -109,6 +111,16 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0
   const progress = totalSec > 0 ? elapsed / totalSec : 0
 
+  const lastBeepRef = useRef('')
+  useEffect(() => {
+    if (!running || finishedRef.current) return
+    if (timeLeft < 1 || timeLeft > BEEP_SECONDS) return
+    const key = `${currentIdx}:${timeLeft}`
+    if (lastBeepRef.current === key) return
+    lastBeepRef.current = key
+    beep(timeLeft === 1)
+  }, [timeLeft, currentIdx, running])
+
   // Пропустить текущую позу
   const handleSkip = () => {
     const nextStart = poseOffsets[currentIdx + 1] ?? totalSec
@@ -154,7 +166,13 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
           Поза {currentIdx + 1} / {playlist.length}
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button onClick={() => setRunning((r) => !r)} style={btnStyle('#444')}>
+          <button
+            onClick={() => {
+              unlockBeep()
+              setRunning((r) => !r)
+            }}
+            style={btnStyle('#444')}
+          >
             {running ? '⏸ Пауза' : '▶ Продолжить'}
           </button>
           <button
