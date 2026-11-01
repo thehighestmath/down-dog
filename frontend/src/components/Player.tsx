@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
 import { useWakeLock } from '../useWakeLock'
+import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
 
 const LANG: AudioLang = AudioLang.Ru
 
@@ -55,6 +56,11 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   // Экран не гаснет, пока тренировка идёт (не на паузе)
   useWakeLock(running)
 
+  // Очередь озвучки: один экземпляр на время тренировки
+  const [audio] = useState(() => new AudioQueue())
+  // При выходе с экрана (стоп, финиш) озвучка замолкает
+  useEffect(() => () => audio.pause(), [audio])
+
   // Сохранение начала тренировки и обновление таймера
   useEffect(() => {
     if (!running || totalSec === 0) return
@@ -84,7 +90,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       setRunning(false)
       onFinish()
     }
-  }, [elapsed, totalSec, onFinish, audio])
+  }, [elapsed, totalSec, onFinish])
 
   // Текущая поза
   let acc = 0
@@ -104,17 +110,20 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     }
   }
 
+  // Озвучка: вступление к новой позе
   useEffect(() => {
     const item = playlist[currentIdx]
     if (!item || finishedRef.current) return
     audio.play(poseIntroUrls(item, currentIdx === 0, LANG))
   }, [currentIdx, playlist, audio])
 
+  // Пауза и продолжение озвучки вместе с тренировкой
   useEffect(() => {
     if (running) audio.resume()
     else audio.pause()
   }, [running, audio])
 
+  // Напоминание про дыхание на середине длинной позы
   const poseDuration = playlist[currentIdx]?.duration ?? 0
   useEffect(() => {
     if (running && poseDuration >= 30 && timeInPose === Math.floor(poseDuration / 2)) {
@@ -167,20 +176,27 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         overflowY: 'auto', // прокрутка только на очень низких экранах (например, ландшафт)
         background: '#111',
         color: '#fff',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: 'clamp(12px, 4vw, 20px)',
+        padding: '0 clamp(12px, 4vw, 20px) clamp(12px, 4vw, 20px)',
         boxSizing: 'border-box',
         maxWidth: '900px',
         margin: '0 auto',
       }}
     >
-      {/* Верхняя строка: счётчик и три кнопки равной ширины */}
-      <div style={{ flex: '0 0 auto' }}>
+      {/* Шапка закреплена сверху: кнопки всегда под рукой, пока читаешь описание */}
+      <div
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 5,
+          background: '#111',
+          paddingTop: 'clamp(12px, 4vw, 20px)',
+          paddingBottom: '8px',
+        }}
+      >
         <div
           style={{
             height: '1.4em',
-            marginBottom: '8px',
+            marginBottom: '6px',
             fontSize: '14px',
             lineHeight: 1.4,
             opacity: 0.7,
@@ -209,36 +225,33 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
             ⏹ Стоп
           </button>
         </div>
-      </div>
-
-      {/* Прогресс тренировки */}
-      <div
-        style={{
-          height: '6px',
-          flexShrink: 0,
-          background: '#333',
-          borderRadius: '3px',
-          marginTop: '14px',
-          overflow: 'hidden',
-        }}
-      >
         <div
           style={{
-            height: '100%',
-            width: `${progress * 100}%`,
-            background: 'linear-gradient(90deg,#4caf50,#8bc34a)',
-            transition: 'width 0.3s linear',
+            height: '6px',
+            background: '#333',
+            borderRadius: '3px',
+            marginTop: '10px',
+            overflow: 'hidden',
           }}
-        />
+        >
+          <div
+            style={{
+              height: '100%',
+              width: `${progress * 100}%`,
+              background: 'linear-gradient(90deg,#4caf50,#8bc34a)',
+              transition: 'width 0.3s linear',
+            }}
+          />
+        </div>
       </div>
 
-      {/* Картинка позы: занимает всё свободное место, поэтому экран не прыгает */}
+      {/* Картинка позы: фиксированная высота от высоты экрана */}
       <div
         style={{
           position: 'relative',
-          flex: '1 1 0',
-          minHeight: '80px',
-          margin: '12px 0',
+          height: 'min(32dvh, 320px)',
+          minHeight: '140px',
+          margin: '10px 0',
         }}
       >
         {imgSrc ? (
@@ -274,11 +287,11 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       </div>
 
       {/* Названия: всегда место под две строки и строку санскрита */}
-      <div style={{ textAlign: 'center', flex: '0 0 auto' }}>
+      <div style={{ textAlign: 'center' }}>
         <div
           style={{
             height: '2.4em',
-            fontSize: 'clamp(22px, 7vw, 32px)',
+            fontSize: 'clamp(20px, 6vw, 30px)',
             fontWeight: 700,
             lineHeight: 1.2,
             display: 'flex',
@@ -300,8 +313,8 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         <div
           style={{
             height: '1.4em',
-            marginTop: '4px',
-            fontSize: '16px',
+            marginTop: '2px',
+            fontSize: '15px',
             lineHeight: 1.4,
             opacity: 0.7,
             overflow: 'hidden',
@@ -318,10 +331,9 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       {/* Таймер */}
       <div
         style={{
-          flex: '0 0 auto',
           textAlign: 'center',
-          marginTop: '8px',
-          fontSize: 'clamp(48px, 16vw, 72px)',
+          marginTop: '6px',
+          fontSize: 'clamp(44px, 14vw, 72px)',
           lineHeight: 1.1,
           fontVariantNumeric: 'tabular-nums',
           fontWeight: 800,
@@ -332,57 +344,11 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         {mm}:{ss}
       </div>
 
-      {/* Описание и противопоказания: блок фиксированной высоты, длинный текст прокручивается */}
-      <div
-        style={{
-          flex: '0 0 auto',
-          height: 'min(26dvh, 200px)',
-          marginTop: '8px',
-          overflowY: 'auto',
-        }}
-      >
-        {current.pose?.description && (
-          <div
-            style={{
-              background: 'rgba(255,255,255,0.08)',
-              padding: '14px',
-              borderRadius: '10px',
-              fontSize: '15px',
-              lineHeight: 1.5,
-              marginBottom: '10px',
-            }}
-          >
-            {current.pose.description}
-          </div>
-        )}
-
-        {current.pose?.contraindications?.trim() &&
-          current.pose.contraindications.trim().toLowerCase() !== 'отсутствуют' && (
-            <div
-              style={{
-                background: 'rgba(198,40,40,0.15)',
-                border: '1px solid rgba(198,40,40,0.4)',
-                padding: '14px',
-                borderRadius: '10px',
-                fontSize: '15px',
-                lineHeight: 1.5,
-                marginBottom: '10px',
-              }}
-            >
-              <div style={{ fontWeight: 700, marginBottom: '6px' }}>
-                ⚠ Противопоказания
-              </div>
-              {current.pose.contraindications}
-            </div>
-          )}
-      </div>
-
       {/* Следующая поза: строка всегда занимает место */}
       <div
         style={{
-          flex: '0 0 auto',
           height: '1.4em',
-          marginTop: '8px',
+          marginTop: '6px',
           textAlign: 'center',
           fontSize: '14px',
           lineHeight: 1.4,
@@ -394,6 +360,42 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       >
         {nextPose ? `Далее: ${nextPose.name_ru || nextPose.name_en}` : '\u00a0'}
       </div>
+
+      {/* Всё, что ниже, зависит от текста, но лежит под основным экраном и ничего не сдвигает */}
+      {current.pose?.description && (
+        <div
+          style={{
+            background: 'rgba(255,255,255,0.08)',
+            padding: '14px',
+            borderRadius: '10px',
+            fontSize: '15px',
+            lineHeight: 1.5,
+            marginTop: '12px',
+          }}
+        >
+          {current.pose.description}
+        </div>
+      )}
+
+      {current.pose?.contraindications?.trim() &&
+        current.pose.contraindications.trim().toLowerCase() !== 'отсутствуют' && (
+          <div
+            style={{
+              background: 'rgba(198,40,40,0.15)',
+              border: '1px solid rgba(198,40,40,0.4)',
+              padding: '14px',
+              borderRadius: '10px',
+              fontSize: '15px',
+              lineHeight: 1.5,
+              marginTop: '12px',
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: '6px' }}>
+              ⚠ Противопоказания
+            </div>
+            {current.pose.contraindications}
+          </div>
+        )}
 
       {/* Подтверждение стопа */}
       {confirmStop && (
