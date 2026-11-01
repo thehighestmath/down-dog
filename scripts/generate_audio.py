@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+import psycopg2
 from elevenlabs.client import ElevenLabs
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -11,7 +12,6 @@ log = logging.getLogger(__name__)
 
 REPO_DIR = Path(__file__).resolve().parents[1]
 AUDIO_DIR = REPO_DIR / "audio"
-SQL_FILE = REPO_DIR / "backend" / "sql" / "02_seed_poses.sql"
 
 LANGS = ("ru", "en")
 VOICES = {"ru": "pNInz6obpgDQGcFmaJgB", "en": "JBFqnCBsd6RMkjVDRZzb"}
@@ -37,8 +37,6 @@ PHRASES = {
     },
 }
 
-SqlValue = str | int | None
-
 
 @dataclass(frozen=True)
 class Pose:
@@ -60,90 +58,32 @@ class Pose:
         return {s for s in (self.hold_time_sec, self.full_cycle_sec) if s}
 
 
-_VALUE_RE = re.compile(r"\s*(?:'((?:[^']|'')*)'|(NULL)\b|(-?\d+)(?![\d.]))\s*", re.I)
-
-
-def _parse_value(row: str, pos: int) -> tuple[SqlValue, int]:
-    match = _VALUE_RE.match(row, pos)
-    if match is None:
-        msg = f"Неподдерживаемое значение в seed: {row[pos : pos + 30]!r}"
-        raise ValueError(msg)
-    text, null, num = match.groups()
-    value: SqlValue = None if null else int(num) if num else text.replace("''", "'")
-    return value, match.end()
-
-
-def _parse_rows(values: str) -> list[list[SqlValue]]:
-    rows: list[list[SqlValue]] = []
-    pos = 0
-    while True:
-        pos = len(values) - len(values[pos:].lstrip())
-        if pos >= len(values) or values[pos] != "(":
-            break
-        pos += 1
-        row: list[SqlValue] = []
-        while True:
-            value, pos = _parse_value(values, pos)
-            row.append(value)
-            if values[pos] == ",":
-                pos += 1
-            elif values[pos] == ")":
-                pos += 1
-                break
-            else:
-                msg = f"Ожидалась ',' или ')' в seed: {values[pos : pos + 30]!r}"
-                raise ValueError(msg)
-        rows.append(row)
-        pos = len(values) - len(values[pos:].lstrip())
-        if pos < len(values) and values[pos] == ",":
-            pos += 1
-        else:
-            break
-    return rows
-
-
-def load_poses(sql_file: Path) -> list[Pose]:
-    sql = sql_file.read_text(encoding="utf-8")
-    inserts = [m.end() for m in re.finditer(r"INSERT\s+INTO\s+poses\b", sql, re.I)]
-    if len(inserts) != 1:
-        msg = f"В {sql_file} ожидался один INSERT INTO poses, найдено {len(inserts)}"
-        raise ValueError(msg)
-    header = re.match(r"\s*\(([^)]*)\)\s*VALUES", sql[inserts[0] :], re.I)
-    if header is None:
-        msg = f"Не найден список колонок INSERT INTO poses в {sql_file}"
-        raise ValueError(msg)
-    columns = [c.strip() for c in header.group(1).split(",")]
-
-    rows = _parse_rows(sql[inserts[0] + header.end() :])
-    for i, row in enumerate(rows, 1):
-        if len(row) != len(columns):
-            msg = f"Поза №{i}: {len(row)} значений при {len(columns)} колонках"
-            raise ValueError(msg)
-
-    poses = []
-    for row in rows:
-        r = dict(zip(columns, row, strict=True))
-        poses.append(
-            Pose(
-                name_ru=str(r["name_ru"]),
-                name_en=str(r["name_en"]),
-                audio_url=r["audio_url"] if isinstance(r["audio_url"], str) else None,
-                hold_time_sec=_int_or_none(r.get("hold_time_sec")),
-                full_cycle_sec=_int_or_none(r.get("full_cycle_sec")),
+def load_poses() -> list[Pose]:
+    """Позы из таблицы poses. По умолчанию — база из docker compose (порт 5432)."""
+    conn = psycopg2.connect(
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=os.getenv("POSTGRES_PORT", "5432"),
+        dbname=os.getenv("POSTGRES_DB", "app_db"),
+        user=os.getenv("POSTGRES_USER", "postgres"),
+        password=os.getenv("POSTGRES_PASSWORD", "postgres"),
+    )
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT name_ru, name_en, audio_url, hold_time_sec, full_cycle_sec "
+                "FROM poses ORDER BY id"
             )
-        )
+            poses = [Pose(*row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
 
     filenames = [p.filename for p in poses]
     duplicates = sorted({f for f in filenames if filenames.count(f) > 1})
     if duplicates:
         msg = f"У разных поз одинаковые имена файлов: {duplicates}"
         raise ValueError(msg)
-    log.info("Поз в %s: %d", sql_file.name, len(poses))
+    log.info("Поз в базе: %d", len(poses))
     return poses
-
-
-def _int_or_none(value: SqlValue) -> int | None:
-    return value if isinstance(value, int) else None
 
 
 _RU_ONES = [
@@ -249,7 +189,7 @@ def speak(client: ElevenLabs, text: str, lang: str, path: Path) -> None:
 
 
 def main() -> None:
-    poses = load_poses(SQL_FILE)
+    poses = load_poses()
     seconds: set[int] = set().union(*(pose.seconds for pose in poses))
     check_seconds_word(seconds)
 
