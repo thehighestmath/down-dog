@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
+import { useWakeLock } from "../useWakeLock";
 
 interface PlayerProps {
   workout: Workout
@@ -45,20 +46,39 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const [running, setRunning] = useState(true)
   const [confirmStop, setConfirmStop] = useState(false)
   const finishedRef = useRef(false)
+  const baseMsRef = useRef(0) 
+  const resumedAtRef = useRef<number | null>(null)
 
-  // Тик таймера
+  // Экран не гаснет, пока тренировка идёт (не на паузе)
+  useWakeLock(running)
+
+  // Сохранение начала тренировки и обновление таймера
   useEffect(() => {
     if (!running || totalSec === 0) return
-    const id = window.setInterval(() => {
-      setElapsed((e) => Math.min(e + 1, totalSec))
-    }, 1000)
-    return () => window.clearInterval(id)
-  }, [running, totalSec])
+    resumedAtRef.current = Date.now()
+    const update = () => {
+    const ms = baseMsRef.current + (Date.now() - (resumedAtRef.current ?? Date.now()))
+    setElapsed(Math.min(Math.floor(ms / 1000), totalSec))
+  }
+
+  const id = window.setInterval(update, 250)
+  const onVisible = () => {
+    if (document.visibilityState === 'visible') update()
+  }
+  document.addEventListener('visibilitychange', onVisible)
+
+  return () => {
+    window.clearInterval(id)
+    document.removeEventListener('visibilitychange', onVisible)
+    baseMsRef.current += Date.now() - (resumedAtRef.current ?? Date.now())
+  }
+}, [running, totalSec])
 
   // Завершение
   useEffect(() => {
     if (totalSec > 0 && elapsed >= totalSec && !finishedRef.current) {
       finishedRef.current = true
+      setRunning(false)
       onFinish()
     }
   }, [elapsed, totalSec, onFinish])
@@ -88,6 +108,8 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   // Пропустить текущую позу
   const handleSkip = () => {
     const nextStart = poseOffsets[currentIdx + 1] ?? totalSec
+    baseMsRef.current = nextStart * 1000
+    resumedAtRef.current = Date.now()
     setElapsed(nextStart)
   }
 
