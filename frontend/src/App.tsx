@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import './App.css'
+import { unlockBeep } from './beep'
 import { fetchPoses, generateWorkout, getWorkoutById } from './api'
 import { FinishedScreen } from './components/FinishedScreen'
 import { HomeScreen } from './components/HomeScreen'
@@ -65,6 +66,7 @@ function App() {
   }
 
   const startWorkout = (w: Workout) => {
+    unlockBeep()
     setActiveWorkout(w)
     setView('player')
   }
@@ -91,7 +93,10 @@ function App() {
           setView('home')
           setActiveWorkout(null)
         }}
-        onRepeat={() => setView('player')}
+        onRepeat={() => {
+          unlockBeep()
+          setView('player')
+        }}
       />
     )
   }
