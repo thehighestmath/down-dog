@@ -146,6 +146,85 @@ def _int_or_none(value: SqlValue) -> int | None:
     return value if isinstance(value, int) else None
 
 
+_RU_ONES = [
+    "",
+    "одна",
+    "две",
+    "три",
+    "четыре",
+    "пять",
+    "шесть",
+    "семь",
+    "восемь",
+    "девять",
+]
+_RU_TEENS = [
+    "десять",
+    "одиннадцать",
+    "двенадцать",
+    "тринадцать",
+    "четырнадцать",
+    "пятнадцать",
+    "шестнадцать",
+    "семнадцать",
+    "восемнадцать",
+    "девятнадцать",
+]
+_RU_TENS = [
+    "",
+    "",
+    "двадцать",
+    "тридцать",
+    "сорок",
+    "пятьдесят",
+    "шестьдесят",
+    "семьдесят",
+    "восемьдесят",
+    "девяносто",
+]
+_RU_HUNDREDS = [
+    "",
+    "сто",
+    "двести",
+    "триста",
+    "четыреста",
+    "пятьсот",
+    "шестьсот",
+    "семьсот",
+    "восемьсот",
+    "девятьсот",
+]
+
+
+def number_ru(n: int) -> str:
+    if not 1 <= n <= 999:
+        msg = f"Поддерживаются числа от 1 до 999, получено {n}"
+        raise ValueError(msg)
+    words = [_RU_HUNDREDS[n // 100]]
+    rest = n % 100
+    if 10 <= rest <= 19:
+        words.append(_RU_TEENS[rest - 10])
+    else:
+        words += [_RU_TENS[rest // 10], _RU_ONES[rest % 10]]
+    return " ".join(w for w in words if w)
+
+
+def number_text(n: int, lang: str) -> str:
+    return number_ru(n) if lang == "ru" else str(n)
+
+
+def check_seconds_word(seconds: set[int]) -> None:
+    wrong = sorted(
+        n for n in seconds if n % 10 in (1, 2, 3, 4) and not 11 <= n % 100 <= 14
+    )
+    if wrong:
+        msg = (
+            f"Для {wrong} нужна форма «секунда/секунды», а не «секунд»: "
+            "добавьте фразы seconds_one/seconds_few и логику выбора на фронте"
+        )
+        raise ValueError(msg)
+
+
 def speak(client: ElevenLabs, text: str, lang: str, path: Path) -> None:
     if path.exists() and path.stat().st_size > 0:
         return
@@ -172,6 +251,8 @@ def speak(client: ElevenLabs, text: str, lang: str, path: Path) -> None:
 def main() -> None:
     poses = load_poses(SQL_FILE)
     seconds: set[int] = set().union(*(pose.seconds for pose in poses))
+    check_seconds_word(seconds)
+
     client = ElevenLabs(api_key=os.environ["ELEVENLABS_API_KEY"])
 
     for lang in LANGS:
@@ -181,7 +262,12 @@ def main() -> None:
         for key, text in PHRASES[lang].items():
             speak(client, text, lang, AUDIO_DIR / f"phrases_{lang}" / f"{key}.mp3")
         for n in sorted(seconds):
-            speak(client, str(n), lang, AUDIO_DIR / f"numbers_{lang}" / f"{n}.mp3")
+            speak(
+                client,
+                number_text(n, lang),
+                lang,
+                AUDIO_DIR / f"numbers_{lang}" / f"{n}.mp3",
+            )
 
 
 if __name__ == "__main__":
