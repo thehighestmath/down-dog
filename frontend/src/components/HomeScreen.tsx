@@ -56,35 +56,58 @@ export function HomeScreen({
     try {
       localStorage.setItem('healthWarningSeen', '1')
     } catch {
+      // localStorage недоступен (например, приватный режим), игнорируем
     }
   }, [generatedWorkout, showWarning])
 
   const cardStyle: CSSProperties = {
     marginBottom: '24px',
-    padding: '20px',
+    padding: 'clamp(14px, 4vw, 20px)',
+    boxSizing: 'border-box',
     background: 'rgba(255,255,255,0.92)',
     borderRadius: '12px',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
   }
 
+  // font-size меньше 16px заставляет iOS Safari зумить страницу при фокусе
+  const fieldStyle: CSSProperties = {
+    padding: '10px',
+    borderRadius: 4,
+    border: '1px solid #ccc',
+    fontSize: '16px',
+    width: '100%',
+    boxSizing: 'border-box',
+  }
+
   return (
     <div
       style={{
-        padding: '20px',
+        padding: 'clamp(12px, 4vw, 20px)',
+        boxSizing: 'border-box',
         fontFamily: 'sans-serif',
         maxWidth: '900px',
         margin: '0 auto',
         color: '#333',
-        minHeight: '100vh',
-        backgroundImage: 'url("/bg.jpg")',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed',
+        minHeight: '100dvh',
+        isolation: 'isolate',
       }}
     >
+      {/* Фон: fixed-слой вместо background-attachment: fixed (на iOS тот не работает) */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: -1,
+          backgroundImage: 'url("/bg.jpg")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      />
       <h1
         style={{
           textAlign: 'center',
+          fontSize: 'clamp(24px, 7vw, 32px)',
           color: '#fff',
           textShadow: '2px 2px 4px rgba(0,0,0,0.7)',
         }}
@@ -112,7 +135,7 @@ export function HomeScreen({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(240px, 100%), 1fr))',
             gap: '10px',
             maxHeight: '300px',
             overflowY: 'auto',
@@ -151,12 +174,19 @@ export function HomeScreen({
             alignItems: 'flex-end',
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '5px',
+              flex: '1 1 160px',
+            }}
+          >
             <label style={{ fontWeight: 'bold' }}>Фокус:</label>
             <select
               value={focus}
               onChange={(e) => setFocus(e.target.value)}
-              style={{ padding: '8px', borderRadius: 4, border: '1px solid #ccc' }}
+              style={fieldStyle}
             >
               {FOCUS_OPTIONS.map(({ value, label }) => (
                 <option key={value} value={value}>
@@ -165,12 +195,19 @@ export function HomeScreen({
               ))}
             </select>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '5px',
+              flex: '1 1 160px',
+            }}
+          >
             <label style={{ fontWeight: 'bold' }}>Уровень:</label>
             <select
               value={level}
               onChange={(e) => setLevel(e.target.value)}
-              style={{ padding: '8px', borderRadius: 4, border: '1px solid #ccc' }}
+              style={fieldStyle}
             >
               {LEVEL_OPTIONS.map(({ value, label }) => (
                 <option key={value} value={value}>
@@ -179,12 +216,19 @@ export function HomeScreen({
               ))}
             </select>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '5px',
+              flex: '1 1 160px',
+            }}
+          >
             <label style={{ fontWeight: 'bold' }}>Длительность (мин):</label>
             <select
               value={durationMin}
               onChange={(e) => setDurationMin(Number(e.target.value))}
-              style={{ padding: '8px', borderRadius: 4, border: '1px solid #ccc' }}
+              style={fieldStyle}
             >
               {DURATIONS.map((min) => (
                 <option key={min} value={min}>
@@ -193,7 +237,11 @@ export function HomeScreen({
               ))}
             </select>
           </div>
-          <button type="submit" disabled={loading} style={btnStyle('#646cff')}>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ ...btnStyle('#646cff'), flex: '1 1 160px' }}
+          >
             {loading ? 'Генерация...' : 'Сгенерировать'}
           </button>
         </form>
@@ -217,6 +265,7 @@ export function HomeScreen({
                 padding: '4px 8px',
                 borderRadius: 4,
                 fontWeight: 'bold',
+                overflowWrap: 'anywhere',
               }}
             >
               {generatedWorkout.id}
@@ -253,7 +302,15 @@ export function HomeScreen({
               Вставить ID в поиск ↓
             </button>
             {showWarning && (
-              <h2 style={{ color: '#f0220f', marginTop: 0, fontSize: '16px', whiteSpace: 'pre-line' }}>
+              <h2
+                style={{
+                  color: '#f0220f',
+                  margin: 0,
+                  fontSize: '16px',
+                  whiteSpace: 'pre-line',
+                  flexBasis: '100%',
+                }}
+              >
                 ❌При травмах и заболеваниях нужно проконсультироваться с врачом!
               </h2>
             )}
@@ -263,18 +320,16 @@ export function HomeScreen({
 
       <section style={cardStyle}>
         <h2 style={{ marginTop: 0 }}>🔍 Найти тренировку по ID</h2>
-        <form onSubmit={onSearch} style={{ display: 'flex', gap: '10px' }}>
+        <form
+          onSubmit={onSearch}
+          style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}
+        >
           <input
             type="text"
             value={searchId}
             onChange={(e) => setSearchId(e.target.value)}
             placeholder="Введите UUID тренировки"
-            style={{
-              padding: '8px',
-              flex: 1,
-              borderRadius: 4,
-              border: '1px solid #ccc',
-            }}
+            style={{ ...fieldStyle, width: 'auto', flex: '1 1 200px', minWidth: 0 }}
           />
           <button type="submit" disabled={loading} style={btnStyle('#333')}>
             Найти
@@ -292,7 +347,7 @@ export function HomeScreen({
             }}
           >
             <h3 style={{ color: '#1565c0', marginTop: 0 }}>Найдена тренировка:</h3>
-            <p>
+            <p style={{ overflowWrap: 'anywhere' }}>
               <strong>ID:</strong> {foundWorkout.id}
             </p>
             <p>

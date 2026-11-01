@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
-import { useWakeLock } from "../useWakeLock";
+import { useWakeLock } from '../useWakeLock'
 
 interface PlayerProps {
   workout: Workout
@@ -46,7 +47,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const [running, setRunning] = useState(true)
   const [confirmStop, setConfirmStop] = useState(false)
   const finishedRef = useRef(false)
-  const baseMsRef = useRef(0) 
+  const baseMsRef = useRef(0)
   const resumedAtRef = useRef<number | null>(null)
 
   // Экран не гаснет, пока тренировка идёт (не на паузе)
@@ -57,22 +58,22 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     if (!running || totalSec === 0) return
     resumedAtRef.current = Date.now()
     const update = () => {
-    const ms = baseMsRef.current + (Date.now() - (resumedAtRef.current ?? Date.now()))
-    setElapsed(Math.min(Math.floor(ms / 1000), totalSec))
-  }
+      const ms = baseMsRef.current + (Date.now() - (resumedAtRef.current ?? Date.now()))
+      setElapsed(Math.min(Math.floor(ms / 1000), totalSec))
+    }
 
-  const id = window.setInterval(update, 250)
-  const onVisible = () => {
-    if (document.visibilityState === 'visible') update()
-  }
-  document.addEventListener('visibilitychange', onVisible)
+    const id = window.setInterval(update, 250)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') update()
+    }
+    document.addEventListener('visibilitychange', onVisible)
 
-  return () => {
-    window.clearInterval(id)
-    document.removeEventListener('visibilitychange', onVisible)
-    baseMsRef.current += Date.now() - (resumedAtRef.current ?? Date.now())
-  }
-}, [running, totalSec])
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+      baseMsRef.current += Date.now() - (resumedAtRef.current ?? Date.now())
+    }
+  }, [running, totalSec])
 
   // Завершение
   useEffect(() => {
@@ -120,6 +121,18 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const nextPose = playlist[currentIdx + 1]?.pose
   const isLastPose = currentIdx === playlist.length - 1
 
+  // Кнопки одинаковой ширины: смена подписи («Пауза» ↔ «Продолжить») не меняет раскладку
+  const controlBtn = (color: string): CSSProperties => ({
+    ...btnStyle(color),
+    width: '100%',
+    minHeight: '44px',
+    padding: '0 4px',
+    fontSize: '14px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  })
+
   const imgSrc = current.pose?.image_url
     ? current.pose.image_url.startsWith('http')
       ? current.pose.image_url
@@ -129,40 +142,50 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        position: 'fixed',
+        inset: 0,
+        overflowY: 'auto', // прокрутка только на очень низких экранах (например, ландшафт)
         background: '#111',
         color: '#fff',
         display: 'flex',
         flexDirection: 'column',
-        padding: '20px',
+        padding: 'clamp(12px, 4vw, 20px)',
         boxSizing: 'border-box',
         maxWidth: '900px',
         margin: '0 auto',
       }}
     >
-      {/* Верхняя строка */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <div style={{ fontSize: '14px', opacity: 0.7 }}>
+      {/* Верхняя строка: счётчик и три кнопки равной ширины */}
+      <div style={{ flex: '0 0 auto' }}>
+        <div
+          style={{
+            height: '1.4em',
+            marginBottom: '8px',
+            fontSize: '14px',
+            lineHeight: 1.4,
+            opacity: 0.7,
+          }}
+        >
           Поза {currentIdx + 1} / {playlist.length}
         </div>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button onClick={() => setRunning((r) => !r)} style={btnStyle('#444')}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+            gap: '8px',
+          }}
+        >
+          <button onClick={() => setRunning((r) => !r)} style={controlBtn('#444')}>
             {running ? '⏸ Пауза' : '▶ Продолжить'}
           </button>
           <button
             onClick={handleSkip}
-            style={btnStyle('#ff9800')}
+            style={controlBtn('#ff9800')}
             title={isLastPose ? 'Завершить тренировку' : 'Пропустить позу'}
           >
             {isLastPose ? '⏭ Завершить' : '⏭ Пропустить'}
           </button>
-          <button onClick={() => setConfirmStop(true)} style={btnStyle('#c62828')}>
+          <button onClick={() => setConfirmStop(true)} style={controlBtn('#c62828')}>
             ⏹ Стоп
           </button>
         </div>
@@ -172,6 +195,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       <div
         style={{
           height: '6px',
+          flexShrink: 0,
           background: '#333',
           borderRadius: '3px',
           marginTop: '14px',
@@ -188,14 +212,13 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         />
       </div>
 
-      {/* Картинка позы */}
+      {/* Картинка позы: занимает всё свободное место, поэтому экран не прыгает */}
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          margin: '24px 0',
-          minHeight: '260px',
+          position: 'relative',
+          flex: '1 1 0',
+          minHeight: '80px',
+          margin: '12px 0',
         }}
       >
         {imgSrc ? (
@@ -205,36 +228,81 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
             loading="eager"
             decoding="async"
             style={{
-              maxWidth: '100%',
-              maxHeight: '420px',
-              borderRadius: '12px',
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
               objectFit: 'contain',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+              borderRadius: '12px',
             }}
           />
         ) : (
-          <div style={{ fontSize: '14px', opacity: 0.5 }}>Изображение недоступно</div>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              fontSize: '14px',
+              opacity: 0.5,
+            }}
+          >
+            Изображение недоступно
+          </div>
         )}
       </div>
 
-      {/* Названия */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '32px', fontWeight: 700, lineHeight: 1.2 }}>
-          {current.pose?.name_ru || current.name}
+      {/* Названия: всегда место под две строки и строку санскрита */}
+      <div style={{ textAlign: 'center', flex: '0 0 auto' }}>
+        <div
+          style={{
+            height: '2.4em',
+            fontSize: 'clamp(22px, 7vw, 32px)',
+            fontWeight: 700,
+            lineHeight: 1.2,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <span
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {current.pose?.name_ru || current.name}
+          </span>
         </div>
-        {current.pose?.name_sanskrit && (
-          <div style={{ fontSize: '16px', opacity: 0.7, marginTop: '6px' }}>
-            {current.pose.name_sanskrit} · {current.pose.name_en}
-          </div>
-        )}
+        <div
+          style={{
+            height: '1.4em',
+            marginTop: '4px',
+            fontSize: '16px',
+            lineHeight: 1.4,
+            opacity: 0.7,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {current.pose?.name_sanskrit
+            ? `${current.pose.name_sanskrit} · ${current.pose.name_en}`
+            : '\u00a0'}
+        </div>
       </div>
 
       {/* Таймер */}
       <div
         style={{
+          flex: '0 0 auto',
           textAlign: 'center',
-          marginTop: '16px',
-          fontSize: '72px',
+          marginTop: '8px',
+          fontSize: 'clamp(48px, 16vw, 72px)',
+          lineHeight: 1.1,
           fontVariantNumeric: 'tabular-nums',
           fontWeight: 800,
           color: timeLeft <= 3 ? '#ff5252' : '#fff',
@@ -244,56 +312,68 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         {mm}:{ss}
       </div>
 
-      {/* Описание */}
-      {current.pose?.description && (
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.08)',
-            padding: '14px',
-            borderRadius: '10px',
-            fontSize: '15px',
-            lineHeight: 1.5,
-            marginTop: '12px',
-            maxHeight: '260px',
-            overflowY: 'auto',
-          }}
-        >
-          {current.pose.description}
-        </div>
-      )}
+      {/* Описание и противопоказания: блок фиксированной высоты, длинный текст прокручивается */}
+      <div
+        style={{
+          flex: '0 0 auto',
+          height: 'min(26dvh, 200px)',
+          marginTop: '8px',
+          overflowY: 'auto',
+        }}
+      >
+        {current.pose?.description && (
+          <div
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              padding: '14px',
+              borderRadius: '10px',
+              fontSize: '15px',
+              lineHeight: 1.5,
+              marginBottom: '10px',
+            }}
+          >
+            {current.pose.description}
+          </div>
+        )}
 
-      {current.pose?.contraindications?.trim() &&
-      current.pose.contraindications.trim().toLowerCase() !== 'отсутствуют' && (
-        <div
-          style={{
-            background: 'rgba(198,40,40,0.15)',
-            border: '1px solid rgba(198,40,40,0.4)',
-            padding: '14px',
-            borderRadius: '10px',
-            fontSize: '15px',
-            lineHeight: 1.5,
-            marginTop: '12px',
-            maxHeight: '160px',
-            overflowY: 'auto',
-          }}
-        >
-        <div style={{ fontWeight: 700, marginBottom: '6px' }}>⚠ Противопоказания</div>
-          {current.pose.contraindications}
-        </div>
-      )}
+        {current.pose?.contraindications?.trim() &&
+          current.pose.contraindications.trim().toLowerCase() !== 'отсутствуют' && (
+            <div
+              style={{
+                background: 'rgba(198,40,40,0.15)',
+                border: '1px solid rgba(198,40,40,0.4)',
+                padding: '14px',
+                borderRadius: '10px',
+                fontSize: '15px',
+                lineHeight: 1.5,
+                marginBottom: '10px',
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: '6px' }}>
+                ⚠ Противопоказания
+              </div>
+              {current.pose.contraindications}
+            </div>
+          )}
+      </div>
 
-      {nextPose && (
-        <div
-          style={{
-            marginTop: '16px',
-            textAlign: 'center',
-            fontSize: '14px',
-            opacity: 0.6,
-          }}
-        >
-          Далее: {nextPose.name_ru || nextPose.name_en}
-        </div>
-      )}
+      {/* Следующая поза: строка всегда занимает место */}
+      <div
+        style={{
+          flex: '0 0 auto',
+          height: '1.4em',
+          marginTop: '8px',
+          textAlign: 'center',
+          fontSize: '14px',
+          lineHeight: 1.4,
+          opacity: 0.6,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {nextPose ? `Далее: ${nextPose.name_ru || nextPose.name_en}` : '\u00a0'}
+      </div>
 
       {/* Подтверждение стопа */}
       {confirmStop && (
@@ -306,6 +386,8 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
             justifyContent: 'center',
             alignItems: 'center',
             zIndex: 10,
+            padding: '20px',
+            boxSizing: 'border-box',
           }}
         >
           <div
@@ -313,7 +395,9 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
               background: '#222',
               padding: '24px',
               borderRadius: '12px',
+              width: '100%',
               maxWidth: '360px',
+              boxSizing: 'border-box',
               textAlign: 'center',
             }}
           >
@@ -323,6 +407,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
                 display: 'flex',
                 gap: '10px',
                 justifyContent: 'center',
+                flexWrap: 'wrap',
                 marginTop: '12px',
               }}
             >
