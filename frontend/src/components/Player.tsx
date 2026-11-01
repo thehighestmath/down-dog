@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AudioQueue, phraseUrl, poseIntroUrls, type AudioLang } from '../audio'
+import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
 
-const LANG: AudioLang = 'ru'
+const LANG: AudioLang = AudioLang.Ru
 
 interface PlayerProps {
   workout: Workout
@@ -64,7 +64,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     if (totalSec > 0 && elapsed >= totalSec && !finishedRef.current) {
       finishedRef.current = true
       audio.stop()
-      new Audio(phraseUrl(LANG, 'finish')).play().catch(() => {})
+      new Audio(phraseUrl(LANG, Phrase.Finish)).play().catch(() => {})
       onFinish()
     }
   }, [elapsed, totalSec, onFinish, audio])
@@ -101,7 +101,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const poseDuration = playlist[currentIdx]?.duration ?? 0
   useEffect(() => {
     if (running && poseDuration >= 30 && timeInPose === Math.floor(poseDuration / 2)) {
-      audio.play([phraseUrl(LANG, 'breathe')])
+      audio.play([phraseUrl(LANG, Phrase.Breathe)])
     }
   }, [timeInPose, poseDuration, running, audio])
 

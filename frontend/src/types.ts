@@ -14,6 +14,7 @@ export interface Pose {
   hold_time_sec: number | null
   full_cycle_sec: number | null
 }
+
 export interface Workout {
   id: string
   duration_min: number
@@ -21,7 +22,9 @@ export interface Workout {
   focus: string
   poses: string[]
 }
+
 export type View = 'home' | 'player' | 'finished'
+
 export interface PlaylistItem {
   name: string
   pose: Pose | undefined

@@ -3,9 +3,12 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import psycopg2
-from elevenlabs.client import ElevenLabs
+
+if TYPE_CHECKING:
+    from elevenlabs.client import ElevenLabs
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
@@ -189,6 +192,8 @@ def speak(client: ElevenLabs, text: str, lang: str, path: Path) -> None:
 
 
 def main() -> None:
+    from elevenlabs.client import ElevenLabs
+
     poses = load_poses()
     seconds: set[int] = set().union(*(pose.seconds for pose in poses))
     check_seconds_word(seconds)

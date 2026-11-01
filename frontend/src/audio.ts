@@ -1,20 +1,36 @@
 import { API_URL } from './constants'
 import type { PlaylistItem } from './types'
 
-export type AudioLang = 'ru' | 'en'
-export type PhraseKey =
-  'start' | 'enter' | 'breathe' | 'hold' | 'seconds' | 'next' | 'finish'
+export const AudioLang = {
+  Ru: 'ru',
+  En: 'en',
+} as const
+export type AudioLang = (typeof AudioLang)[keyof typeof AudioLang]
 
-function url(
-  lang: AudioLang,
-  kind: 'poses' | 'phrases' | 'numbers',
-  name: string,
-): string {
+export const AudioKind = {
+  Poses: 'poses',
+  Phrases: 'phrases',
+  Numbers: 'numbers',
+} as const
+export type AudioKind = (typeof AudioKind)[keyof typeof AudioKind]
+
+export const Phrase = {
+  Start: 'start',
+  Enter: 'enter',
+  Breathe: 'breathe',
+  Hold: 'hold',
+  Seconds: 'seconds',
+  Next: 'next',
+  Finish: 'finish',
+} as const
+export type Phrase = (typeof Phrase)[keyof typeof Phrase]
+
+function url(lang: AudioLang, kind: AudioKind, name: string): string {
   return `${API_URL}/audio/${lang}/${kind}/${encodeURIComponent(name)}`
 }
 
-export function phraseUrl(lang: AudioLang, key: PhraseKey): string {
-  return url(lang, 'phrases', key)
+export function phraseUrl(lang: AudioLang, phrase: Phrase): string {
+  return url(lang, AudioKind.Phrases, phrase)
 }
 
 export function poseIntroUrls(
@@ -23,15 +39,15 @@ export function poseIntroUrls(
   lang: AudioLang,
 ): string[] {
   const urls = isFirst
-    ? [phraseUrl(lang, 'start')]
-    : [phraseUrl(lang, 'next'), phraseUrl(lang, 'enter')]
+    ? [phraseUrl(lang, Phrase.Start)]
+    : [phraseUrl(lang, Phrase.Next), phraseUrl(lang, Phrase.Enter)]
   if (item.pose?.audio_name) {
-    urls.push(url(lang, 'poses', item.pose.audio_name))
+    urls.push(url(lang, AudioKind.Poses, item.pose.audio_name))
   }
   urls.push(
-    phraseUrl(lang, 'hold'),
-    url(lang, 'numbers', String(item.duration)),
-    phraseUrl(lang, 'seconds'),
+    phraseUrl(lang, Phrase.Hold),
+    url(lang, AudioKind.Numbers, String(item.duration)),
+    phraseUrl(lang, Phrase.Seconds),
   )
   return urls
 }
