@@ -58,3 +58,4 @@ def test_pose_filename_from_audio_url() -> None:
 
 def test_pose_seconds_skips_empty_values() -> None:
     assert Pose("Поза", "Tree", None, 30, None).seconds == {30}
+    
