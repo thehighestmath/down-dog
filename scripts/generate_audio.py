@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from elevenlabs.client import ElevenLabs
+from elevenlabs.client import ElevenLabs # type: ignore[import-not-found]
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
