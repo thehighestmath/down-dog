@@ -25,7 +25,8 @@ export function unlockBeep(): void {
     src.buffer = c.createBuffer(1, 1, 22050)
     src.connect(c.destination)
     src.start(0)
-  } catch {
+  } catch (err) {
+    console.warn('Звук недоступен:', err)
   }
 }
 
@@ -46,6 +47,7 @@ export function beep(final = false): void {
     gain.connect(c.destination)
     osc.start(now)
     osc.stop(now + duration)
-  } catch {
+  } catch (err) {
+    console.warn('Звук недоступен:', err)
   }
 }
