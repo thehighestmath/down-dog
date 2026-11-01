@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
+
+const LANG: AudioLang = AudioLang.Ru
 
 interface PlayerProps {
   workout: Workout
@@ -45,8 +48,9 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const [running, setRunning] = useState(true)
   const [confirmStop, setConfirmStop] = useState(false)
   const finishedRef = useRef(false)
+  const [audio] = useState(() => new AudioQueue())
 
-  // Тик таймера
+  useEffect(() => () => audio.stop(), [audio])
   useEffect(() => {
     if (!running || totalSec === 0) return
     const id = window.setInterval(() => {
@@ -59,9 +63,11 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   useEffect(() => {
     if (totalSec > 0 && elapsed >= totalSec && !finishedRef.current) {
       finishedRef.current = true
+      audio.stop()
+      new Audio(phraseUrl(LANG, Phrase.Finish)).play().catch(() => {})
       onFinish()
     }
-  }, [elapsed, totalSec, onFinish])
+  }, [elapsed, totalSec, onFinish, audio])
 
   // Текущая поза
   let acc = 0
@@ -80,6 +86,24 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       timeInPose = d
     }
   }
+
+  useEffect(() => {
+    const item = playlist[currentIdx]
+    if (!item || finishedRef.current) return
+    audio.play(poseIntroUrls(item, currentIdx === 0, LANG))
+  }, [currentIdx, playlist, audio])
+
+  useEffect(() => {
+    if (running) audio.resume()
+    else audio.pause()
+  }, [running, audio])
+
+  const poseDuration = playlist[currentIdx]?.duration ?? 0
+  useEffect(() => {
+    if (running && poseDuration >= 30 && timeInPose === Math.floor(poseDuration / 2)) {
+      audio.play([phraseUrl(LANG, Phrase.Breathe)])
+    }
+  }, [timeInPose, poseDuration, running, audio])
 
   const current = playlist[currentIdx]
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0
