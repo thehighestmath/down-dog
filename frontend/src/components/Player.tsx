@@ -262,6 +262,26 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         </div>
       )}
 
+      {current.pose?.contraindications?.trim() &&
+      current.pose.contraindications.trim().toLowerCase() !== 'отсутствуют' && (
+        <div
+          style={{
+            background: 'rgba(198,40,40,0.15)',
+            border: '1px solid rgba(198,40,40,0.4)',
+            padding: '14px',
+            borderRadius: '10px',
+            fontSize: '15px',
+            lineHeight: 1.5,
+            marginTop: '12px',
+            maxHeight: '160px',
+            overflowY: 'auto',
+          }}
+        >
+        <div style={{ fontWeight: 700, marginBottom: '6px' }}>⚠ Противопоказания</div>
+          {current.pose.contraindications}
+        </div>
+      )}
+
       {nextPose && (
         <div
           style={{

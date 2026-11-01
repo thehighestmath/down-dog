@@ -1,4 +1,5 @@
 import type { CSSProperties, FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { DURATIONS, FOCUS_OPTIONS, LEVEL_OPTIONS } from '../constants'
 import type { Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
@@ -40,6 +41,24 @@ export function HomeScreen({
   onSearch,
   onStartWorkout,
 }: HomeScreenProps) {
+  // Показывать предупреждение, пока оно не было увидено раньше
+  const [showWarning] = useState(() => {
+    try {
+      return localStorage.getItem('healthWarningSeen') !== '1'
+    } catch {
+      return true
+    }
+  })
+
+  // Помечаем как просмотренное, когда блок с тренировкой реально появился
+  useEffect(() => {
+    if (!generatedWorkout || !showWarning) return
+    try {
+      localStorage.setItem('healthWarningSeen', '1')
+    } catch {
+    }
+  }, [generatedWorkout, showWarning])
+
   const cardStyle: CSSProperties = {
     marginBottom: '24px',
     padding: '20px',
@@ -233,6 +252,11 @@ export function HomeScreen({
             >
               Вставить ID в поиск ↓
             </button>
+            {showWarning && (
+              <h2 style={{ color: '#f0220f', marginTop: 0, fontSize: '16px', whiteSpace: 'pre-line' }}>
+                ❌При травмах и заболеваниях нужно проконсультироваться с врачом!
+              </h2>
+            )}
           </div>
         </section>
       )}
