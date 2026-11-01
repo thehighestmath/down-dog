@@ -2,9 +2,14 @@ import { API_URL } from './constants'
 import type { PlaylistItem } from './types'
 
 export type AudioLang = 'ru' | 'en'
-export type PhraseKey = 'start' | 'enter' | 'breathe' | 'hold' | 'seconds' | 'next' | 'finish'
+export type PhraseKey =
+  'start' | 'enter' | 'breathe' | 'hold' | 'seconds' | 'next' | 'finish'
 
-function url(lang: AudioLang, kind: 'poses' | 'phrases' | 'numbers', name: string): string {
+function url(
+  lang: AudioLang,
+  kind: 'poses' | 'phrases' | 'numbers',
+  name: string,
+): string {
   return `${API_URL}/audio/${lang}/${kind}/${encodeURIComponent(name)}`
 }
 
@@ -12,8 +17,11 @@ export function phraseUrl(lang: AudioLang, key: PhraseKey): string {
   return url(lang, 'phrases', key)
 }
 
-
-export function poseIntroUrls(item: PlaylistItem, isFirst: boolean, lang: AudioLang): string[] {
+export function poseIntroUrls(
+  item: PlaylistItem,
+  isFirst: boolean,
+  lang: AudioLang,
+): string[] {
   const urls = isFirst
     ? [phraseUrl(lang, 'start')]
     : [phraseUrl(lang, 'next'), phraseUrl(lang, 'enter')]
