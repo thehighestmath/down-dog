@@ -134,8 +134,9 @@ jobs:
               gh project item-edit --project-id "$project_id" --id "$item" \
                 --field-id "$review_date_field" --clear >/dev/null
             fi
-            body="${mentions:+$mentions }Задача возвращена в **$TO_STATUS**: к ней не залинкован ПР.
-          Добавь \`Closes #$number\` в описание ПР или привяжи его через панель Linked issues, и потом переводи задачу в $FROM_STATUS."
+            body="${mentions:+$mentions }Задача возвращена в **$TO_STATUS**: к ней не залинкован ПР."
+            body+=$'\n'"Добавь \`Closes #$number\` в описание ПР или привяжи его через панель Linked issues,"
+            body+=" и потом переводи задачу в $FROM_STATUS."
             gh issue comment "$number" -R "$repo" --body "$body" >/dev/null
             echo "$repo#$number: $FROM_STATUS -> $TO_STATUS" | tee -a "$GITHUB_STEP_SUMMARY"
             rolled=$((rolled + 1))
