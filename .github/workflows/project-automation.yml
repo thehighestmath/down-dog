@@ -19,6 +19,11 @@ name: Project automation
 # задачи (closingIssuesReferences) и снимает её, когда связь появилась. Дублирует
 # pr-linked-issue.yml по расписанию: возвращает метку, если её сняли руками, и
 # ловит привязку через панель Linked issues - на неё нет события для Actions.
+#
+# review-rollback: возвращает задачи из In Review в In Progress, если к ним не
+# залинкован ни один открытый или смерженный ПР (closedByPullRequestsReferences),
+# очищает дату "В In Review с" и пишет в issue комментарий исполнителям.
+# Идёт до fill, чтобы fill в том же запуске не поставил дату обратно.
 
 on:
   schedule:
@@ -32,8 +37,117 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  review-rollback:
+    name: Roll back In Review issues without a linked PR
+    runs-on: ubuntu-latest
+    env:
+      # Нужен classic PAT со scope project и repo
+      GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+      OWNER: thehighestmath
+      PROJECT_NUMBER: 5
+      FROM_STATUS: In Review
+      TO_STATUS: In Progress
+    steps:
+      - name: Roll back
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error title=PROJECT_TOKEN::Не задан секрет PROJECT_TOKEN (classic PAT со scope project и repo)"
+            exit 1
+          fi
+
+          # $-переменные в одинарных кавычках ниже - переменные GraphQL и jq, не shell
+          # shellcheck disable=SC2016
+          project=$(gh api graphql \
+            -f login="$OWNER" -F number="$PROJECT_NUMBER" \
+            -f query='
+              query($login: String!, $number: Int!) {
+                user(login: $login) {
+                  projectV2(number: $number) {
+                    id
+                    status: field(name: "Status") {
+                      ... on ProjectV2SingleSelectField { id options { id name } }
+                    }
+                    fields(first: 50) {
+                      nodes { ... on ProjectV2Field { id name dataType } }
+                    }
+                  }
+                }
+              }')
+          project_id=$(jq -r '.data.user.projectV2.id' <<<"$project")
+          status_field=$(jq -r '.data.user.projectV2.status.id' <<<"$project")
+          to_option=$(jq -r '.data.user.projectV2.status.options[]
+            | select(.name == env.TO_STATUS) | .id' <<<"$project")
+          if [ -z "$to_option" ]; then
+            echo "::error::В поле Status нет варианта \"$TO_STATUS\""
+            exit 1
+          fi
+          # Дату "В In Review с" очищаем, чтобы при настоящем переходе в ревью fill поставил новую
+          review_date_field=$(jq -r '.data.user.projectV2.fields.nodes[]
+            | select(.dataType == "DATE" and .name == ("В " + env.FROM_STATUS + " с")) | .id' <<<"$project")
+
+          # Строки "<item id>\t<repo>\t<номер>\t<@исполнители>" для issue в In Review
+          # без открытого или смерженного ПР
+          # shellcheck disable=SC2016
+          rollback=$(gh api graphql --paginate \
+            -f login="$OWNER" -F number="$PROJECT_NUMBER" \
+            -f query='
+              query($login: String!, $number: Int!, $endCursor: String) {
+                user(login: $login) {
+                  projectV2(number: $number) {
+                    items(first: 100, after: $endCursor) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes {
+                        id
+                        status: fieldValueByName(name: "Status") {
+                          ... on ProjectV2ItemFieldSingleSelectValue { name }
+                        }
+                        content {
+                          ... on Issue {
+                            number
+                            repository { nameWithOwner }
+                            assignees(first: 10) { nodes { login } }
+                            closedByPullRequestsReferences(first: 20, includeClosedPrs: true) {
+                              nodes { state }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }' \
+            --jq '.data.user.projectV2.items.nodes[]
+              | select(.status.name == env.FROM_STATUS and .content.number != null)
+              | select([.content.closedByPullRequestsReferences.nodes[].state
+                  | select(. == "OPEN" or . == "MERGED")] | length == 0)
+              | [.id, .content.repository.nameWithOwner, .content.number,
+                 ([.content.assignees.nodes[].login | "@" + .] | join(" "))]
+              | @tsv')
+
+          rolled=0
+          while IFS=$'\t' read -r item repo number mentions; do
+            [ -n "$item" ] || continue
+            gh project item-edit --project-id "$project_id" --id "$item" \
+              --field-id "$status_field" --single-select-option-id "$to_option" >/dev/null
+            if [ -n "$review_date_field" ]; then
+              gh project item-edit --project-id "$project_id" --id "$item" \
+                --field-id "$review_date_field" --clear >/dev/null
+            fi
+            body="${mentions:+$mentions }Задача возвращена в **$TO_STATUS**: к ней не залинкован ПР.
+          Добавь \`Closes #$number\` в описание ПР или привяжи его через панель Linked issues, и потом переводи задачу в $FROM_STATUS."
+            gh issue comment "$number" -R "$repo" --body "$body" >/dev/null
+            echo "$repo#$number: $FROM_STATUS -> $TO_STATUS" | tee -a "$GITHUB_STEP_SUMMARY"
+            rolled=$((rolled + 1))
+          done <<<"$rollback"
+
+          echo "Возвращено задач: $rolled" | tee -a "$GITHUB_STEP_SUMMARY"
+
   fill:
     name: Fill "В <статус> с" fields
+    # После отката, иначе fill может поставить дату "В In Review с" обратно
+    needs: review-rollback
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     env:
       # GITHUB_TOKEN не видит пользовательские проекты: нужен classic PAT со scope project
