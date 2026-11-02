@@ -6,6 +6,7 @@ import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audi
 import './Player.css'
 
 const LANG: AudioLang = AudioLang.Ru
+const BEEP_SECONDS = 3
 
 interface PlayerProps {
   workout: Workout
@@ -134,6 +135,16 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const current = playlist[currentIdx]
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0
   const progress = totalSec > 0 ? elapsed / totalSec : 0
+
+  const lastBeepRef = useRef('')
+  useEffect(() => {
+    if (!running || finishedRef.current) return
+    if (timeLeft < 1 || timeLeft > BEEP_SECONDS) return
+    const key = `${currentIdx}:${timeLeft}`
+    if (lastBeepRef.current === key) return
+    lastBeepRef.current = key
+    beep(timeLeft === 1)
+  }, [timeLeft, currentIdx, running])
 
   // Пропустить текущую позу
   const handleSkip = () => {
