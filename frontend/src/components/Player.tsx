@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { trackPoseViewed } from '../analytics'
-import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
-import { beep, unlockBeep } from '../beep'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
-
-const LANG: AudioLang = AudioLang.Ru
-const BEEP_SECONDS = 3
+import { useWakeLock } from '../useWakeLock'
+import { beep, unlockBeep } from '../beep'
+import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
+import './Player.css'
 
 interface PlayerProps {
   workout: Workout
@@ -16,6 +15,9 @@ interface PlayerProps {
 }
 
 export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
+  const LANG = AudioLang.Ru
+  const BEEP_SECONDS = 3
+
   const poseMap = useMemo(() => new Map(poses.map((p) => [p.name_en, p])), [poses])
 
   const playlist: PlaylistItem[] = useMemo(
@@ -51,27 +53,50 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const [running, setRunning] = useState(true)
   const [confirmStop, setConfirmStop] = useState(false)
   const finishedRef = useRef(false)
+  const baseMsRef = useRef(0)
+  const resumedAtRef = useRef<number | null>(null)
+
+  // Экран не гаснет, пока тренировка идёт (не на паузе)
+  useWakeLock(running)
   const prevPoseIdx = useRef(-1)
   const [audio] = useState(() => new AudioQueue())
 
+  // Очередь озвучки: один экземпляр на время тренировки
+  // При выходе с экрана (стоп, финиш) озвучка замолкает и очередь сбрасывается
   useEffect(() => () => audio.stop(), [audio])
+
+  // Сохранение начала тренировки и обновление таймера
   useEffect(() => {
     if (!running || totalSec === 0) return
-    const id = window.setInterval(() => {
-      setElapsed((e) => Math.min(e + 1, totalSec))
-    }, 1000)
-    return () => window.clearInterval(id)
+    resumedAtRef.current = Date.now()
+    const update = () => {
+      const ms = baseMsRef.current + (Date.now() - (resumedAtRef.current ?? Date.now()))
+      setElapsed(Math.min(Math.floor(ms / 1000), totalSec))
+    }
+
+    const id = window.setInterval(update, 250)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') update()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+      baseMsRef.current += Date.now() - (resumedAtRef.current ?? Date.now())
+    }
   }, [running, totalSec])
 
-  // Завершение
+  // Завершение: останавливаем очередь и озвучиваем финальную фразу
   useEffect(() => {
     if (totalSec > 0 && elapsed >= totalSec && !finishedRef.current) {
       finishedRef.current = true
+      setRunning(false)
       audio.stop()
       new Audio(phraseUrl(LANG, Phrase.Finish)).play().catch(() => {})
       onFinish()
     }
-  }, [elapsed, totalSec, onFinish, audio])
+  }, [elapsed, totalSec, onFinish, audio, LANG])
 
   // Текущая поза
   let acc = 0
@@ -91,28 +116,32 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     }
   }
 
+  // Озвучка: вступление к новой позе
   useEffect(() => {
     const item = playlist[currentIdx]
     if (!item || finishedRef.current) return
     audio.play(poseIntroUrls(item, currentIdx === 0, LANG))
-  }, [currentIdx, playlist, audio])
+  }, [currentIdx, playlist, audio, LANG])
 
+  // Пауза и продолжение озвучки вместе с тренировкой
   useEffect(() => {
     if (running) audio.resume()
     else audio.pause()
   }, [running, audio])
 
+  // Напоминание про дыхание на середине длинной позы
   const poseDuration = playlist[currentIdx]?.duration ?? 0
   useEffect(() => {
     if (running && poseDuration >= 30 && timeInPose === Math.floor(poseDuration / 2)) {
       audio.play([phraseUrl(LANG, Phrase.Breathe)])
     }
-  }, [timeInPose, poseDuration, running, audio])
+  }, [timeInPose, poseDuration, running, audio, LANG])
 
   const current = playlist[currentIdx]
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0
   const progress = totalSec > 0 ? elapsed / totalSec : 0
 
+  // Звуковой сигнал в последние секунды позы (по одному разу на каждую секунду)
   // Трекинг смены позы
   useEffect(() => {
     if (currentIdx !== prevPoseIdx.current && current) {
@@ -140,6 +169,8 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       return
     }
     const nextStart = poseOffsets[currentIdx + 1] ?? totalSec
+    baseMsRef.current = nextStart * 1000
+    resumedAtRef.current = Date.now()
     setElapsed(nextStart)
   }
 
@@ -148,200 +179,101 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const ss = String(timeLeft % 60).padStart(2, '0')
   const nextPose = playlist[currentIdx + 1]?.pose
-
-  const imgSrc = current.pose?.image_url
-    ? current.pose.image_url.startsWith('http')
-      ? current.pose.image_url
-      : current.pose.image_url
-    : null
+  const contraindications = current.pose?.contraindications?.trim()
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#111',
-        color: '#fff',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '20px',
-        boxSizing: 'border-box',
-        maxWidth: '900px',
-        margin: '0 auto',
-      }}
-    >
-      {/* Верхняя строка */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <div style={{ fontSize: '14px', opacity: 0.7 }}>
+    <div className="player">
+      <div className="player__header">
+        <div className="player__counter">
           Поза {currentIdx + 1} / {playlist.length}
         </div>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <div className="player__controls">
           <button
             onClick={() => {
-              unlockBeep()
+              unlockBeep() // разблокировка звука браузером требует жеста пользователя
               setRunning((r) => !r)
             }}
+            className="player__control-btn"
             style={btnStyle('#444')}
           >
             {running ? '⏸ Пауза' : '▶ Продолжить'}
           </button>
           <button
             onClick={handleSkip}
+            className="player__control-btn"
             style={btnStyle('#ff9800')}
             title={isLastPose ? 'Завершить тренировку' : 'Пропустить позу'}
           >
             {isLastPose ? '⏭ Завершить' : '⏭ Пропустить'}
           </button>
-          <button onClick={() => setConfirmStop(true)} style={btnStyle('#c62828')}>
+          <button
+            onClick={() => setConfirmStop(true)}
+            className="player__control-btn"
+            style={btnStyle('#c62828')}
+          >
             ⏹ Стоп
           </button>
         </div>
+        <div className="player__progress">
+          <div
+            className="player__progress-bar"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
       </div>
 
-      {/* Прогресс тренировки */}
-      <div
-        style={{
-          height: '6px',
-          background: '#333',
-          borderRadius: '3px',
-          marginTop: '14px',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            height: '100%',
-            width: `${progress * 100}%`,
-            background: 'linear-gradient(90deg,#4caf50,#8bc34a)',
-            transition: 'width 0.3s linear',
-          }}
-        />
-      </div>
-
-      {/* Картинка позы */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          margin: '24px 0',
-          minHeight: '260px',
-        }}
-      >
-        {imgSrc ? (
+      <div className="player__image-wrap">
+        {current.pose?.image_url ? (
           <img
-            src={imgSrc}
+            className="player__image"
+            src={current.pose.image_url}
             alt={current.pose?.name_en || current.name}
             loading="eager"
             decoding="async"
-            style={{
-              maxWidth: '100%',
-              maxHeight: '420px',
-              borderRadius: '12px',
-              objectFit: 'contain',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-            }}
           />
         ) : (
-          <div style={{ fontSize: '14px', opacity: 0.5 }}>Изображение недоступно</div>
+          <div className="player__image-placeholder">Изображение недоступно</div>
         )}
       </div>
 
-      {/* Названия */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '32px', fontWeight: 700, lineHeight: 1.2 }}>
-          {current.pose?.name_ru || current.name}
+      <div className="player__titles">
+        <div className="player__title">
+          <span className="player__title-text">
+            {current.pose?.name_ru || current.name}
+          </span>
         </div>
-        {current.pose?.name_sanskrit && (
-          <div style={{ fontSize: '16px', opacity: 0.7, marginTop: '6px' }}>
-            {current.pose.name_sanskrit} · {current.pose.name_en}
-          </div>
-        )}
+        <div className="player__subtitle">
+          {current.pose?.name_sanskrit
+            ? `${current.pose.name_sanskrit} · ${current.pose.name_en}`
+            : '\u00a0'}
+        </div>
       </div>
 
-      {/* Таймер */}
-      <div
-        style={{
-          textAlign: 'center',
-          marginTop: '16px',
-          fontSize: '72px',
-          fontVariantNumeric: 'tabular-nums',
-          fontWeight: 800,
-          color: timeLeft <= 3 ? '#ff5252' : '#fff',
-          transition: 'color 0.2s',
-        }}
-      >
+      <div className={`player__timer${timeLeft <= 3 ? ' player__timer--warning' : ''}`}>
         {mm}:{ss}
       </div>
 
-      {/* Описание */}
+      <div className="player__next">
+        {nextPose ? `Далее: ${nextPose.name_ru || nextPose.name_en}` : '\u00a0'}
+      </div>
+
       {current.pose?.description && (
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.08)',
-            padding: '14px',
-            borderRadius: '10px',
-            fontSize: '15px',
-            lineHeight: 1.5,
-            marginTop: '12px',
-            maxHeight: '260px',
-            overflowY: 'auto',
-          }}
-        >
-          {current.pose.description}
+        <div className="player__description">{current.pose.description}</div>
+      )}
+
+      {contraindications && contraindications.toLowerCase() !== 'отсутствуют' && (
+        <div className="player__contraindications">
+          <div className="player__contraindications-title">⚠ Противопоказания</div>
+          {contraindications}
         </div>
       )}
 
-      {nextPose && (
-        <div
-          style={{
-            marginTop: '16px',
-            textAlign: 'center',
-            fontSize: '14px',
-            opacity: 0.6,
-          }}
-        >
-          Далее: {nextPose.name_ru || nextPose.name_en}
-        </div>
-      )}
-
-      {/* Подтверждение стопа */}
       {confirmStop && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.7)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 10,
-          }}
-        >
-          <div
-            style={{
-              background: '#222',
-              padding: '24px',
-              borderRadius: '12px',
-              maxWidth: '360px',
-              textAlign: 'center',
-            }}
-          >
-            <p style={{ marginTop: 0 }}>Завершить тренировку досрочно?</p>
-            <div
-              style={{
-                display: 'flex',
-                gap: '10px',
-                justifyContent: 'center',
-                marginTop: '12px',
-              }}
-            >
-              <button onClick={() => onStop(currentIdx)} style={btnStyle('#c62828')}>
+        <div className="player__modal-overlay">
+          <div className="player__modal">
+            <p className="player__modal-text">Завершить тренировку досрочно?</p>
+            <div className="player__modal-actions">
+              <button onClick={() => onStop()} style={btnStyle('#c62828')}>
                 Да, стоп
               </button>
               <button onClick={() => setConfirmStop(false)} style={btnStyle('#444')}>

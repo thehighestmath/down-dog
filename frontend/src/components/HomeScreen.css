@@ -1,0 +1,178 @@
+.home {
+  padding: clamp(12px, 4vw, 20px);
+  box-sizing: border-box;
+  font-family: sans-serif;
+  max-width: 900px;
+  margin: 0 auto;
+  color: #333;
+  min-height: 100dvh;
+  isolation: isolate;
+}
+
+/* Фон: fixed-слой вместо background-attachment: fixed (на iOS тот не работает) */
+.home__bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: url('/bg.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
+.home__title {
+  text-align: center;
+  font-size: clamp(24px, 7vw, 32px);
+  color: #fff;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.home__error {
+  color: #d32f2f;
+  padding: 15px;
+  background: rgba(255, 235, 238, 0.95);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-weight: bold;
+}
+
+.home__card {
+  margin-bottom: 24px;
+  padding: clamp(14px, 4vw, 20px);
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.home__card-title {
+  margin-top: 0;
+}
+
+/* База поз */
+.home__pose-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.home__pose-item {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: white;
+}
+
+.home__pose-name-ru {
+  font-size: 11px;
+  color: #888;
+}
+
+.home__pose-meta {
+  font-size: 12px;
+  color: #666;
+  margin-top: 5px;
+}
+
+/* Форма генерации */
+.home__form {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.home__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1 1 160px;
+}
+
+.home__label {
+  font-weight: bold;
+}
+
+/* font-size меньше 16px заставляет iOS Safari зумить страницу при фокусе */
+.home__input {
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.home__submit {
+  flex: 1 1 160px;
+}
+
+/* Готовая тренировка */
+.home__card--generated {
+  border: 2px solid #4caf50;
+  background: rgba(232, 245, 233, 0.95);
+}
+
+.home__card-title--success {
+  color: #2e7d32;
+  margin-top: 0;
+}
+
+.home__id {
+  background: #e0e0e0;
+  color: #d32f2f;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.home__pose-list {
+  line-height: 1.6;
+}
+
+.home__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.home__warning {
+  color: #f0220f;
+  margin: 0;
+  font-size: 16px;
+  white-space: pre-line;
+  flex-basis: 100%;
+}
+
+/* Поиск по ID */
+.home__search-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.home__search-input {
+  width: auto;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.home__found {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(227, 242, 253, 0.95);
+  border-radius: 8px;
+  border: 1px solid #90caf9;
+}
+
+.home__found-title {
+  color: #1565c0;
+  margin-top: 0;
+}
+
+.home__found-id {
+  overflow-wrap: anywhere;
+}

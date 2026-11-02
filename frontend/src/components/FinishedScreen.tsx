@@ -1,5 +1,6 @@
 import type { Workout } from '../types'
 import { btnStyle } from '../utils/styles'
+import './FinishedScreen.css'
 
 interface FinishedScreenProps {
   workout: Workout
@@ -9,32 +10,31 @@ interface FinishedScreenProps {
 
 export function FinishedScreen({ workout, onHome, onRepeat }: FinishedScreenProps) {
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        background: 'linear-gradient(135deg,#1b5e20,#2e7d32)',
-        color: '#fff',
-        padding: '32px',
-        textAlign: 'center',
-      }}
-    >
-      <div style={{ fontSize: '64px' }}>🎉</div>
-      <h1 style={{ marginTop: '8px' }}>Тренировка завершена!</h1>
-      <p style={{ opacity: 0.85 }}>
-        {workout.duration_min} мин · {workout.level} · {workout.focus}
-      </p>
-      <p style={{ opacity: 0.7, fontSize: '14px' }}>
-        Поз в практике: {workout.poses.length}
-      </p>
-      <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-        <button onClick={onRepeat} style={btnStyle('#4caf50')}>
+    <div className="finished">
+      <div className="finished__emoji">🎉</div>
+      <h1 className="finished__title">Тренировка завершена!</h1>
+
+      <div className="finished__params">
+        <span className="finished__params-text">
+          {workout.duration_min} мин · {workout.level} · {workout.focus}
+        </span>
+      </div>
+
+      <p className="finished__count">Поз в практике: {workout.poses.length}</p>
+
+      <div className="finished__actions">
+        <button
+          onClick={onRepeat}
+          className="finished__action-btn"
+          style={btnStyle('#4caf50')}
+        >
           🔁 Повторить
         </button>
-        <button onClick={onHome} style={btnStyle('#455a64')}>
+        <button
+          onClick={onHome}
+          className="finished__action-btn"
+          style={btnStyle('#455a64')}
+        >
           🏠 На главную
         </button>
       </div>
