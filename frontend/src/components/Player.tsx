@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { trackPoseViewed } from '../analytics'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
 import { useWakeLock } from '../useWakeLock'
@@ -9,7 +10,7 @@ import './Player.css'
 interface PlayerProps {
   workout: Workout
   poses: Pose[]
-  onStop: () => void
+  onStop: (poseIndex?: number) => void
   onFinish: () => void
 }
 
@@ -57,9 +58,10 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
 
   // Экран не гаснет, пока тренировка идёт (не на паузе)
   useWakeLock(running)
+  const prevPoseIdx = useRef(-1)
+  const [audio] = useState(() => new AudioQueue())
 
   // Очередь озвучки: один экземпляр на время тренировки
-  const audio = useMemo(() => new AudioQueue(), [])
   // При выходе с экрана (стоп, финиш) озвучка замолкает и очередь сбрасывается
   useEffect(() => () => audio.stop(), [audio])
 
@@ -140,6 +142,16 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const progress = totalSec > 0 ? elapsed / totalSec : 0
 
   // Звуковой сигнал в последние секунды позы (по одному разу на каждую секунду)
+  // Трекинг смены позы
+  useEffect(() => {
+    if (currentIdx !== prevPoseIdx.current && current) {
+      prevPoseIdx.current = currentIdx
+      trackPoseViewed(workout.id, current.name, currentIdx)
+    }
+  }, [currentIdx, current, workout.id])
+
+  const isLastPose = currentIdx === playlist.length - 1
+
   const lastBeepRef = useRef('')
   useEffect(() => {
     if (!running || finishedRef.current) return
@@ -152,6 +164,10 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
 
   // Пропустить текущую позу
   const handleSkip = () => {
+    if (isLastPose) {
+      onStop(currentIdx)
+      return
+    }
     const nextStart = poseOffsets[currentIdx + 1] ?? totalSec
     baseMsRef.current = nextStart * 1000
     resumedAtRef.current = Date.now()
@@ -163,7 +179,6 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const ss = String(timeLeft % 60).padStart(2, '0')
   const nextPose = playlist[currentIdx + 1]?.pose
-  const isLastPose = currentIdx === playlist.length - 1
   const contraindications = current.pose?.contraindications?.trim()
 
   return (

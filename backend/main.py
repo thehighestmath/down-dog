@@ -1,3 +1,5 @@
+import json
+import logging
 import os
 import re
 import uuid
@@ -13,6 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
+
+logger = logging.getLogger("app")
 
 app = FastAPI()
 
@@ -109,6 +113,13 @@ class WorkoutRequest(BaseModel):
     duration_min: int
     level: str
     focus: str
+
+
+class AnalyticsEvent(BaseModel):
+    event_type: str
+    user_id: str
+    session_id: str
+    payload: dict | None = None
 
 
 # =========================================
@@ -225,6 +236,51 @@ def get_workout(workout_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Тренировка не найдена")
 
     return workout
+
+
+ALLOWED_EVENT_TYPES = (
+    "workout_started",
+    "workout_completed",
+    "workout_abandoned",
+    "pose_viewed",
+)
+
+
+@app.post("/api/analytics/track")
+def track_event(event: AnalyticsEvent) -> dict[str, str]:
+    if event.event_type not in ALLOWED_EVENT_TYPES:
+        raise HTTPException(status_code=400, detail="Недопустимый event_type")
+
+    try:
+        user_uuid = uuid.UUID(event.user_id)
+        session_uuid = uuid.UUID(event.session_id)
+    except ValueError, AttributeError:
+        raise HTTPException(
+            status_code=400, detail="user_id и session_id должны быть валидными UUID"
+        ) from None
+
+    logger.info("Event: %s", json.dumps(event.model_dump()))
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO analytics_events (event_type, user_id, session_id, payload)
+                VALUES (%s, %s::uuid, %s::uuid, %s::jsonb)
+                """,
+                (
+                    event.event_type,
+                    str(user_uuid),
+                    str(session_uuid),
+                    json.dumps(event.payload or {}),
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {"status": "ok"}
 
 
 # =========================================

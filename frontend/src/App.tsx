@@ -1,5 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import './App.css'
+import {
+  trackWorkoutAbandoned,
+  trackWorkoutCompleted,
+  trackWorkoutStarted,
+} from './analytics'
 import { unlockBeep } from './beep'
 import { fetchPoses, generateWorkout, getWorkoutById } from './api'
 import { FinishedScreen } from './components/FinishedScreen'
@@ -69,6 +74,11 @@ function App() {
     unlockBeep()
     setActiveWorkout(w)
     setView('player')
+    trackWorkoutStarted(w.id, {
+      duration_min: w.duration_min,
+      level: w.level,
+      focus: w.focus,
+    })
   }
 
   if (view === 'player' && activeWorkout) {
@@ -76,11 +86,19 @@ function App() {
       <Player
         workout={activeWorkout}
         poses={poses}
-        onStop={() => {
+        onStop={(poseIndex) => {
+          trackWorkoutAbandoned(activeWorkout.id, {
+            current_pose_index: poseIndex,
+          })
           setView('home')
           setActiveWorkout(null)
         }}
-        onFinish={() => setView('finished')}
+        onFinish={() => {
+          trackWorkoutCompleted(activeWorkout.id, {
+            poses_count: activeWorkout.poses.length,
+          })
+          setView('finished')
+        }}
       />
     )
   }
@@ -93,10 +111,7 @@ function App() {
           setView('home')
           setActiveWorkout(null)
         }}
-        onRepeat={() => {
-          unlockBeep()
-          setView('player')
-        }}
+        onRepeat={() => startWorkout(activeWorkout)}
       />
     )
   }
