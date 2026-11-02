@@ -3,6 +3,7 @@ import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audi
 import { beep, unlockBeep } from '../beep'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
+import styles from './Player.module.css'
 
 const LANG: AudioLang = AudioLang.Ru
 const BEEP_SECONDS = 3
@@ -35,7 +36,6 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     [playlist],
   )
 
-  // Смещения начала каждой позы: [0, 30, 65, ...]
   const poseOffsets = useMemo(() => {
     const offsets: number[] = []
     let acc = 0
@@ -53,6 +53,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const [audio] = useState(() => new AudioQueue())
 
   useEffect(() => () => audio.stop(), [audio])
+
   useEffect(() => {
     if (!running || totalSec === 0) return
     const id = window.setInterval(() => {
@@ -61,7 +62,6 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     return () => window.clearInterval(id)
   }, [running, totalSec])
 
-  // Завершение
   useEffect(() => {
     if (totalSec > 0 && elapsed >= totalSec && !finishedRef.current) {
       finishedRef.current = true
@@ -71,7 +71,6 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     }
   }, [elapsed, totalSec, onFinish, audio])
 
-  // Текущая поза
   let acc = 0
   let currentIdx = 0
   let timeInPose = 0
@@ -121,13 +120,25 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     beep(timeLeft === 1)
   }, [timeLeft, currentIdx, running])
 
-  // Пропустить текущую позу
   const handleSkip = () => {
     const nextStart = poseOffsets[currentIdx + 1] ?? totalSec
     setElapsed(nextStart)
   }
 
-  if (!current) return null
+  if (!current || !workout?.poses || workout.poses.length === 0) {
+    return (
+      <div className={styles.emptyContainer}>
+        <div className={styles.emptyTitle}>Тренировка пуста</div>
+        <div className={styles.emptyText}>
+          Не удалось найти упражнения для этой тренировки. Пожалуйста, вернитесь назад и
+          измените параметры.
+        </div>
+        <button onClick={() => onStop()} style={btnStyle('#444')}>
+          Вернуться назад
+        </button>
+      </div>
+    )
+  }
 
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const ss = String(timeLeft % 60).padStart(2, '0')
@@ -141,31 +152,12 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     : null
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#111',
-        color: '#fff',
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '20px',
-        boxSizing: 'border-box',
-        maxWidth: '900px',
-        margin: '0 auto',
-      }}
-    >
-      {/* Верхняя строка */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <div style={{ fontSize: '14px', opacity: 0.7 }}>
+    <div className={styles.container}>
+      <div className={styles.headerRow}>
+        <div className={styles.poseCounter}>
           Поза {currentIdx + 1} / {playlist.length}
         </div>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <div className={styles.buttonGroup}>
           <button
             onClick={() => {
               unlockBeep()
@@ -188,144 +180,60 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         </div>
       </div>
 
-      {/* Прогресс тренировки */}
-      <div
-        style={{
-          height: '6px',
-          background: '#333',
-          borderRadius: '3px',
-          marginTop: '14px',
-          overflow: 'hidden',
-        }}
-      >
+      <div className={styles.progressBarContainer}>
         <div
-          style={{
-            height: '100%',
-            width: `${progress * 100}%`,
-            background: 'linear-gradient(90deg,#4caf50,#8bc34a)',
-            transition: 'width 0.3s linear',
-          }}
+          className={styles.progressBarFill}
+          style={{ width: `${progress * 100}%` }}
         />
       </div>
 
-      {/* Картинка позы */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          margin: '24px 0',
-          minHeight: '260px',
-        }}
-      >
+      <div className={styles.imageWrapper}>
         {imgSrc ? (
           <img
             src={imgSrc}
             alt={current.pose?.name_en || current.name}
             loading="eager"
             decoding="async"
-            style={{
-              maxWidth: '100%',
-              maxHeight: '420px',
-              borderRadius: '12px',
-              objectFit: 'contain',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-            }}
+            className={styles.poseImage}
           />
         ) : (
-          <div style={{ fontSize: '14px', opacity: 0.5 }}>Изображение недоступно</div>
+          <div className={styles.imagePlaceholder}>Изображение недоступно</div>
         )}
       </div>
 
-      {/* Названия */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '32px', fontWeight: 700, lineHeight: 1.2 }}>
+      <div className={styles.titlesContainer}>
+        <div className={styles.poseTitleRu}>
           {current.pose?.name_ru || current.name}
         </div>
         {current.pose?.name_sanskrit && (
-          <div style={{ fontSize: '16px', opacity: 0.7, marginTop: '6px' }}>
+          <div className={styles.poseTitleSub}>
             {current.pose.name_sanskrit} · {current.pose.name_en}
           </div>
         )}
       </div>
 
-      {/* Таймер */}
       <div
-        style={{
-          textAlign: 'center',
-          marginTop: '16px',
-          fontSize: '72px',
-          fontVariantNumeric: 'tabular-nums',
-          fontWeight: 800,
-          color: timeLeft <= 3 ? '#ff5252' : '#fff',
-          transition: 'color 0.2s',
-        }}
+        className={styles.timer}
+        style={{ color: timeLeft <= 3 ? '#ff5252' : '#fff' }}
       >
         {mm}:{ss}
       </div>
 
-      {/* Описание */}
       {current.pose?.description && (
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.08)',
-            padding: '14px',
-            borderRadius: '10px',
-            fontSize: '15px',
-            lineHeight: 1.5,
-            marginTop: '12px',
-            maxHeight: '260px',
-            overflowY: 'auto',
-          }}
-        >
-          {current.pose.description}
-        </div>
+        <div className={styles.descriptionBox}>{current.pose.description}</div>
       )}
 
       {nextPose && (
-        <div
-          style={{
-            marginTop: '16px',
-            textAlign: 'center',
-            fontSize: '14px',
-            opacity: 0.6,
-          }}
-        >
+        <div className={styles.nextPose}>
           Далее: {nextPose.name_ru || nextPose.name_en}
         </div>
       )}
 
-      {/* Подтверждение стопа */}
       {confirmStop && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.7)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 10,
-          }}
-        >
-          <div
-            style={{
-              background: '#222',
-              padding: '24px',
-              borderRadius: '12px',
-              maxWidth: '360px',
-              textAlign: 'center',
-            }}
-          >
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
             <p style={{ marginTop: 0 }}>Завершить тренировку досрочно?</p>
-            <div
-              style={{
-                display: 'flex',
-                gap: '10px',
-                justifyContent: 'center',
-                marginTop: '12px',
-              }}
-            >
+            <div className={styles.modalButtons}>
               <button onClick={() => onStop()} style={btnStyle('#c62828')}>
                 Да, стоп
               </button>
