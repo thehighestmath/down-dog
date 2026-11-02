@@ -14,6 +14,11 @@ name: Project automation
 # deadline: вешает метку overdue на открытые issue, у которых поле "Дедлайн"
 # уже прошло, и снимает её, когда дедлайн перенесли вперёд, убрали или задачу
 # закрыли.
+#
+# linked-issue: вешает метку no-linked-issue на открытые ПР без залинкованной
+# задачи (closingIssuesReferences) и снимает её, когда связь появилась. Дублирует
+# pr-linked-issue.yml по расписанию: возвращает метку, если её сняли руками, и
+# ловит привязку через панель Linked issues - на неё нет события для Actions.
 
 on:
   schedule:
@@ -256,4 +261,62 @@ jobs:
               gh issue edit "$number" -R "$repo" --remove-label "$LABEL" >/dev/null
             fi
             echo "$repo#$number: $action $LABEL" | tee -a "$GITHUB_STEP_SUMMARY"
+          done <<<"$changes"
+
+  linked-issue:
+    name: Label PRs without a linked issue
+    runs-on: ubuntu-latest
+    env:
+      # Для меток PAT нужен scope repo
+      GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+      OWNER: thehighestmath
+      REPO: down-dog
+      LABEL: no-linked-issue
+    steps:
+      - name: Sync no-linked-issue label
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error title=PROJECT_TOKEN::Не задан секрет PROJECT_TOKEN (classic PAT со scope project и repo)"
+            exit 1
+          fi
+
+          # Строки "<номер>\t<add|remove>" для открытых ПР, где метку надо поставить или снять.
+          # $-переменные в одинарных кавычках - переменные GraphQL и jq, не shell
+          # shellcheck disable=SC2016
+          changes=$(gh api graphql --paginate \
+            -f owner="$OWNER" -f repo="$REPO" \
+            -f query='
+              query($owner: String!, $repo: String!, $endCursor: String) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequests(states: OPEN, first: 100, after: $endCursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      number
+                      closingIssuesReferences { totalCount }
+                      labels(first: 100) { nodes { name } }
+                    }
+                  }
+                }
+              }' \
+            --jq '.data.repository.pullRequests.nodes[]
+              | (.closingIssuesReferences.totalCount == 0) as $unlinked
+              | ([.labels.nodes[].name] | index(env.LABEL) != null) as $labeled
+              | if $unlinked and ($labeled | not) then [.number, "add"]
+                elif ($unlinked | not) and $labeled then [.number, "remove"]
+                else empty end
+              | @tsv')
+
+          while IFS=$'\t' read -r number action; do
+            [ -n "$number" ] || continue
+            if [ "$action" = add ]; then
+              if ! gh label list -R "$OWNER/$REPO" --limit 500 --json name --jq '.[].name' | grep -Fxq "$LABEL"; then
+                gh label create "$LABEL" -R "$OWNER/$REPO" --color d93f0b \
+                  --description "PR has no linked issue/task"
+              fi
+              gh pr edit "$number" -R "$OWNER/$REPO" --add-label "$LABEL" >/dev/null
+            else
+              gh pr edit "$number" -R "$OWNER/$REPO" --remove-label "$LABEL" >/dev/null
+            fi
+            echo "PR #$number: $action $LABEL" | tee -a "$GITHUB_STEP_SUMMARY"
           done <<<"$changes"
