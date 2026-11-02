@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
 import { useWakeLock } from '../useWakeLock'
+import { beep, unlockBeep } from '../beep'
 import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
 import './Player.css'
 
@@ -59,8 +60,8 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
 
   // Очередь озвучки: один экземпляр на время тренировки
   const [audio] = useState(() => new AudioQueue())
-  // При выходе с экрана (стоп, финиш) озвучка замолкает
-  useEffect(() => () => audio.pause(), [audio])
+  // При выходе с экрана (стоп, финиш) озвучка замолкает и очередь сбрасывается
+  useEffect(() => () => audio.stop(), [audio])
 
   // Сохранение начала тренировки и обновление таймера
   useEffect(() => {
@@ -84,14 +85,16 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     }
   }, [running, totalSec])
 
-  // Завершение
+  // Завершение: останавливаем очередь и озвучиваем финальную фразу
   useEffect(() => {
     if (totalSec > 0 && elapsed >= totalSec && !finishedRef.current) {
       finishedRef.current = true
       setRunning(false)
+      audio.stop()
+      new Audio(phraseUrl(LANG, Phrase.Finish)).play().catch(() => {})
       onFinish()
     }
-  }, [elapsed, totalSec, onFinish])
+  }, [elapsed, totalSec, onFinish, audio])
 
   // Текущая поза
   let acc = 0
@@ -136,6 +139,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0
   const progress = totalSec > 0 ? elapsed / totalSec : 0
 
+  // Звуковой сигнал в последние секунды позы (по одному разу на каждую секунду)
   const lastBeepRef = useRef('')
   useEffect(() => {
     if (!running || finishedRef.current) return
@@ -171,7 +175,10 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         </div>
         <div className="player__controls">
           <button
-            onClick={() => setRunning((r) => !r)}
+            onClick={() => {
+              unlockBeep() // разблокировка звука браузером требует жеста пользователя
+              setRunning((r) => !r)
+            }}
             className="player__control-btn"
             style={btnStyle('#444')}
           >
