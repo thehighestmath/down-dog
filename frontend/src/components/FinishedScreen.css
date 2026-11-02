@@ -1,0 +1,73 @@
+.finished {
+  /* Привязан к видимой области экрана: не зависит от отступов родителей и не прокручивается */
+  position: fixed;
+  inset: 0;
+  overflow-y: auto; /* только на очень низких экранах (например, ландшафт) */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #1b5e20, #2e7d32);
+  color: #fff;
+  padding: clamp(16px, 5vw, 32px);
+  text-align: center;
+}
+
+.finished__emoji {
+  font-size: 64px;
+  line-height: 1.1;
+}
+
+.finished__title {
+  margin: 8px 0 0;
+  font-size: clamp(20px, 7vw, 32px);
+  line-height: 1.2;
+}
+
+/* Параметры: всегда место под две строки, длинный текст обрезается */
+.finished__params {
+  width: 100%;
+  height: 2.8em;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+.finished__params-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.finished__count {
+  margin: 4px 0 0;
+  opacity: 0.7;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.finished__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+  margin-top: 24px;
+}
+
+/* Цвет кнопки приходит из btnStyle (inline), поэтому размеры переопределяем через !important.
+   Кнопки одинаковой ширины: раскладка не зависит от подписей */
+.finished__action-btn {
+  width: 100% !important;
+  min-height: 44px !important;
+  padding: 0 8px !important;
+  font-size: 15px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}

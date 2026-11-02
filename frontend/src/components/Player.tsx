@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
 import { useWakeLock } from '../useWakeLock'
 import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
+import './Player.css'
 
 const LANG: AudioLang = AudioLang.Ru
 
@@ -149,290 +149,98 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const ss = String(timeLeft % 60).padStart(2, '0')
   const nextPose = playlist[currentIdx + 1]?.pose
   const isLastPose = currentIdx === playlist.length - 1
-
-  // Кнопки одинаковой ширины: смена подписи («Пауза» ↔ «Продолжить») не меняет раскладку
-  const controlBtn = (color: string): CSSProperties => ({
-    ...btnStyle(color),
-    width: '100%',
-    minHeight: '44px',
-    padding: '0 4px',
-    fontSize: '14px',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  })
-
-  const imgSrc = current.pose?.image_url
-    ? current.pose.image_url.startsWith('http')
-      ? current.pose.image_url
-      : current.pose.image_url
-    : null
+  const imgSrc = current.pose?.image_url || null
+  const contraindications = current.pose?.contraindications?.trim()
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        overflowY: 'auto', // прокрутка только на очень низких экранах (например, ландшафт)
-        background: '#111',
-        color: '#fff',
-        padding: '0 clamp(12px, 4vw, 20px) clamp(12px, 4vw, 20px)',
-        boxSizing: 'border-box',
-        maxWidth: '900px',
-        margin: '0 auto',
-      }}
-    >
-      {/* Шапка закреплена сверху: кнопки всегда под рукой, пока читаешь описание */}
-      <div
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 5,
-          background: '#111',
-          paddingTop: 'clamp(12px, 4vw, 20px)',
-          paddingBottom: '8px',
-        }}
-      >
-        <div
-          style={{
-            height: '1.4em',
-            marginBottom: '6px',
-            fontSize: '14px',
-            lineHeight: 1.4,
-            opacity: 0.7,
-          }}
-        >
+    <div className="player">
+      <div className="player__header">
+        <div className="player__counter">
           Поза {currentIdx + 1} / {playlist.length}
         </div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: '8px',
-          }}
-        >
-          <button onClick={() => setRunning((r) => !r)} style={controlBtn('#444')}>
+        <div className="player__controls">
+          <button
+            onClick={() => setRunning((r) => !r)}
+            className="player__control-btn"
+            style={btnStyle('#444')}
+          >
             {running ? '⏸ Пауза' : '▶ Продолжить'}
           </button>
           <button
             onClick={handleSkip}
-            style={controlBtn('#ff9800')}
+            className="player__control-btn"
+            style={btnStyle('#ff9800')}
             title={isLastPose ? 'Завершить тренировку' : 'Пропустить позу'}
           >
             {isLastPose ? '⏭ Завершить' : '⏭ Пропустить'}
           </button>
-          <button onClick={() => setConfirmStop(true)} style={controlBtn('#c62828')}>
+          <button
+            onClick={() => setConfirmStop(true)}
+            className="player__control-btn"
+            style={btnStyle('#c62828')}
+          >
             ⏹ Стоп
           </button>
         </div>
-        <div
-          style={{
-            height: '6px',
-            background: '#333',
-            borderRadius: '3px',
-            marginTop: '10px',
-            overflow: 'hidden',
-          }}
-        >
+        <div className="player__progress">
           <div
-            style={{
-              height: '100%',
-              width: `${progress * 100}%`,
-              background: 'linear-gradient(90deg,#4caf50,#8bc34a)',
-              transition: 'width 0.3s linear',
-            }}
+            className="player__progress-bar"
+            style={{ width: `${progress * 100}%` }}
           />
         </div>
       </div>
 
-      {/* Картинка позы: фиксированная высота от высоты экрана */}
-      <div
-        style={{
-          position: 'relative',
-          height: 'min(32dvh, 320px)',
-          minHeight: '140px',
-          margin: '10px 0',
-        }}
-      >
+      <div className="player__image-wrap">
         {imgSrc ? (
           <img
+            className="player__image"
             src={imgSrc}
             alt={current.pose?.name_en || current.name}
             loading="eager"
             decoding="async"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              borderRadius: '12px',
-            }}
           />
         ) : (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              fontSize: '14px',
-              opacity: 0.5,
-            }}
-          >
-            Изображение недоступно
-          </div>
+          <div className="player__image-placeholder">Изображение недоступно</div>
         )}
       </div>
 
-      {/* Названия: всегда место под две строки и строку санскрита */}
-      <div style={{ textAlign: 'center' }}>
-        <div
-          style={{
-            height: '2.4em',
-            fontSize: 'clamp(20px, 6vw, 30px)',
-            fontWeight: 700,
-            lineHeight: 1.2,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <span
-            style={{
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}
-          >
+      <div className="player__titles">
+        <div className="player__title">
+          <span className="player__title-text">
             {current.pose?.name_ru || current.name}
           </span>
         </div>
-        <div
-          style={{
-            height: '1.4em',
-            marginTop: '2px',
-            fontSize: '15px',
-            lineHeight: 1.4,
-            opacity: 0.7,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
+        <div className="player__subtitle">
           {current.pose?.name_sanskrit
             ? `${current.pose.name_sanskrit} · ${current.pose.name_en}`
             : '\u00a0'}
         </div>
       </div>
 
-      {/* Таймер */}
-      <div
-        style={{
-          textAlign: 'center',
-          marginTop: '6px',
-          fontSize: 'clamp(44px, 14vw, 72px)',
-          lineHeight: 1.1,
-          fontVariantNumeric: 'tabular-nums',
-          fontWeight: 800,
-          color: timeLeft <= 3 ? '#ff5252' : '#fff',
-          transition: 'color 0.2s',
-        }}
-      >
+      <div className={`player__timer${timeLeft <= 3 ? ' player__timer--warning' : ''}`}>
         {mm}:{ss}
       </div>
 
-      {/* Следующая поза: строка всегда занимает место */}
-      <div
-        style={{
-          height: '1.4em',
-          marginTop: '6px',
-          textAlign: 'center',
-          fontSize: '14px',
-          lineHeight: 1.4,
-          opacity: 0.6,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
-      >
+      <div className="player__next">
         {nextPose ? `Далее: ${nextPose.name_ru || nextPose.name_en}` : '\u00a0'}
       </div>
 
-      {/* Всё, что ниже, зависит от текста, но лежит под основным экраном и ничего не сдвигает */}
       {current.pose?.description && (
-        <div
-          style={{
-            background: 'rgba(255,255,255,0.08)',
-            padding: '14px',
-            borderRadius: '10px',
-            fontSize: '15px',
-            lineHeight: 1.5,
-            marginTop: '12px',
-          }}
-        >
-          {current.pose.description}
+        <div className="player__description">{current.pose.description}</div>
+      )}
+
+      {contraindications && contraindications.toLowerCase() !== 'отсутствуют' && (
+        <div className="player__contraindications">
+          <div className="player__contraindications-title">⚠ Противопоказания</div>
+          {contraindications}
         </div>
       )}
 
-      {current.pose?.contraindications?.trim() &&
-        current.pose.contraindications.trim().toLowerCase() !== 'отсутствуют' && (
-          <div
-            style={{
-              background: 'rgba(198,40,40,0.15)',
-              border: '1px solid rgba(198,40,40,0.4)',
-              padding: '14px',
-              borderRadius: '10px',
-              fontSize: '15px',
-              lineHeight: 1.5,
-              marginTop: '12px',
-            }}
-          >
-            <div style={{ fontWeight: 700, marginBottom: '6px' }}>
-              ⚠ Противопоказания
-            </div>
-            {current.pose.contraindications}
-          </div>
-        )}
-
-      {/* Подтверждение стопа */}
       {confirmStop && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.7)',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 10,
-            padding: '20px',
-            boxSizing: 'border-box',
-          }}
-        >
-          <div
-            style={{
-              background: '#222',
-              padding: '24px',
-              borderRadius: '12px',
-              width: '100%',
-              maxWidth: '360px',
-              boxSizing: 'border-box',
-              textAlign: 'center',
-            }}
-          >
-            <p style={{ marginTop: 0 }}>Завершить тренировку досрочно?</p>
-            <div
-              style={{
-                display: 'flex',
-                gap: '10px',
-                justifyContent: 'center',
-                flexWrap: 'wrap',
-                marginTop: '12px',
-              }}
-            >
+        <div className="player__modal-overlay">
+          <div className="player__modal">
+            <p className="player__modal-text">Завершить тренировку досрочно?</p>
+            <div className="player__modal-actions">
               <button onClick={() => onStop()} style={btnStyle('#c62828')}>
                 Да, стоп
               </button>
