@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { trackPoseViewed } from '../analytics'
 import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
 import { beep, unlockBeep } from '../beep'
 import type { PlaylistItem, Pose, Workout } from '../types'
@@ -10,7 +11,7 @@ const BEEP_SECONDS = 3
 interface PlayerProps {
   workout: Workout
   poses: Pose[]
-  onStop: () => void
+  onStop: (poseIndex?: number) => void
   onFinish: () => void
 }
 
@@ -50,6 +51,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const [running, setRunning] = useState(true)
   const [confirmStop, setConfirmStop] = useState(false)
   const finishedRef = useRef(false)
+  const prevPoseIdx = useRef(-1)
   const [audio] = useState(() => new AudioQueue())
 
   useEffect(() => () => audio.stop(), [audio])
@@ -111,6 +113,16 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0
   const progress = totalSec > 0 ? elapsed / totalSec : 0
 
+  // Трекинг смены позы
+  useEffect(() => {
+    if (currentIdx !== prevPoseIdx.current && current) {
+      prevPoseIdx.current = currentIdx
+      trackPoseViewed(workout.id, current.name, currentIdx)
+    }
+  }, [currentIdx, current, workout.id])
+
+  const isLastPose = currentIdx === playlist.length - 1
+
   const lastBeepRef = useRef('')
   useEffect(() => {
     if (!running || finishedRef.current) return
@@ -123,6 +135,10 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
 
   // Пропустить текущую позу
   const handleSkip = () => {
+    if (isLastPose) {
+      onStop(currentIdx)
+      return
+    }
     const nextStart = poseOffsets[currentIdx + 1] ?? totalSec
     setElapsed(nextStart)
   }
@@ -132,7 +148,6 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const ss = String(timeLeft % 60).padStart(2, '0')
   const nextPose = playlist[currentIdx + 1]?.pose
-  const isLastPose = currentIdx === playlist.length - 1
 
   const imgSrc = current.pose?.image_url
     ? current.pose.image_url.startsWith('http')
@@ -326,7 +341,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
                 marginTop: '12px',
               }}
             >
-              <button onClick={() => onStop()} style={btnStyle('#c62828')}>
+              <button onClick={() => onStop(currentIdx)} style={btnStyle('#c62828')}>
                 Да, стоп
               </button>
               <button onClick={() => setConfirmStop(false)} style={btnStyle('#444')}>

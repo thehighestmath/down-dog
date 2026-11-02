@@ -82,10 +82,10 @@
 **Упрощения MVP:**
 
 - Нет аутентификации
-- Нет User Service / Analytics Service
+- Нет отдельного сервиса аналитики (встроена в бэкенд: `POST /api/analytics/track` и таблица `analytics_events`)
 - Нет Redis
 - Нет CDN
-- 1 таблица в БД (`poses`), миграции — сырые SQL-файлы
+- Миграции — сырые SQL-файлы
 
 ---
 
