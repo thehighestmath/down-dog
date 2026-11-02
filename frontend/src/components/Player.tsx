@@ -6,9 +6,6 @@ import { beep, unlockBeep } from '../beep'
 import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
 import './Player.css'
 
-const LANG: AudioLang = AudioLang.Ru
-const BEEP_SECONDS = 3
-
 interface PlayerProps {
   workout: Workout
   poses: Pose[]
@@ -17,6 +14,9 @@ interface PlayerProps {
 }
 
 export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
+  const LANG = AudioLang.Ru
+  const BEEP_SECONDS = 3
+
   const poseMap = useMemo(() => new Map(poses.map((p) => [p.name_en, p])), [poses])
 
   const playlist: PlaylistItem[] = useMemo(
@@ -59,7 +59,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   useWakeLock(running)
 
   // Очередь озвучки: один экземпляр на время тренировки
-  const [audio] = useState(() => new AudioQueue())
+  const audio = useMemo(() => new AudioQueue(), [])
   // При выходе с экрана (стоп, финиш) озвучка замолкает и очередь сбрасывается
   useEffect(() => () => audio.stop(), [audio])
 
@@ -94,7 +94,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       new Audio(phraseUrl(LANG, Phrase.Finish)).play().catch(() => {})
       onFinish()
     }
-  }, [elapsed, totalSec, onFinish, audio])
+  }, [elapsed, totalSec, onFinish, audio, LANG])
 
   // Текущая поза
   let acc = 0
@@ -119,7 +119,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     const item = playlist[currentIdx]
     if (!item || finishedRef.current) return
     audio.play(poseIntroUrls(item, currentIdx === 0, LANG))
-  }, [currentIdx, playlist, audio])
+  }, [currentIdx, playlist, audio, LANG])
 
   // Пауза и продолжение озвучки вместе с тренировкой
   useEffect(() => {
@@ -133,7 +133,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     if (running && poseDuration >= 30 && timeInPose === Math.floor(poseDuration / 2)) {
       audio.play([phraseUrl(LANG, Phrase.Breathe)])
     }
-  }, [timeInPose, poseDuration, running, audio])
+  }, [timeInPose, poseDuration, running, audio, LANG])
 
   const current = playlist[currentIdx]
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0
@@ -164,7 +164,6 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const ss = String(timeLeft % 60).padStart(2, '0')
   const nextPose = playlist[currentIdx + 1]?.pose
   const isLastPose = currentIdx === playlist.length - 1
-  const imgSrc = current.pose?.image_url || null
   const contraindications = current.pose?.contraindications?.trim()
 
   return (
@@ -209,10 +208,10 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       </div>
 
       <div className="player__image-wrap">
-        {imgSrc ? (
+        {current.pose?.image_url ? (
           <img
             className="player__image"
-            src={imgSrc}
+            src={current.pose.image_url}
             alt={current.pose?.name_en || current.name}
             loading="eager"
             decoding="async"
