@@ -252,7 +252,6 @@ docker compose down
 
 Команда `docker compose down -v` дополнительно удаляет volumes PostgreSQL и MinIO вместе с сохранёнными данными; используйте её только если действительно хотите сбросить локальную базу и файлы.
 
-
 # Документация по работе с Adminer (GUI базы данных)
 
 **Adminer** — это веб-интерфейс для управления СУБД PostgreSQL прямо из браузера. Он автоматически запускается вместе со всеми сервисами через `docker compose`.
@@ -337,15 +336,15 @@ CORS_ORIGINS=https://your-domain.com
 
 Назначение переменных:
 
-| Переменная | Назначение |
-|---|---|
-| `POSTGRES_DB` | Имя базы данных |
-| `POSTGRES_USER` | Пользователь PostgreSQL |
-| `POSTGRES_PASSWORD` | Пароль PostgreSQL |
-| `MINIO_ROOT_USER` | Имя администратора MinIO |
-| `MINIO_ROOT_PASSWORD` | Пароль администратора MinIO |
-| `BUCKET_NAME` | Имя S3-бакета |
-| `CORS_ORIGINS` | Разрешённые источники запросов к API |
+| Переменная            | Назначение                           |
+| --------------------- | ------------------------------------ |
+| `POSTGRES_DB`         | Имя базы данных                      |
+| `POSTGRES_USER`       | Пользователь PostgreSQL              |
+| `POSTGRES_PASSWORD`   | Пароль PostgreSQL                    |
+| `MINIO_ROOT_USER`     | Имя администратора MinIO             |
+| `MINIO_ROOT_PASSWORD` | Пароль администратора MinIO          |
+| `BUCKET_NAME`         | Имя S3-бакета                        |
+| `CORS_ORIGINS`        | Разрешённые источники запросов к API |
 
 Для нескольких источников CORS используйте список через запятую:
 
@@ -356,6 +355,7 @@ CORS_ORIGINS=https://your-domain.com,https://admin.your-domain.com
 Указывайте полный origin: протокол, домен и при необходимости порт. Не добавляйте путь `/api`.
 
 **Безопасность:**
+
 - Не храните реальные пароли и другие секреты в `.env.example`.
 - Файл `.env` не должен попадать в Git.
 - Используйте уникальные сложные пароли для PostgreSQL и MinIO.
@@ -412,7 +412,7 @@ docker compose --env-file .env -f docker-compose.prod.yml exec backend curl -fsS
 Ожидаемый ответ:
 
 ```json
-{"status":"ok"}
+{ "status": "ok" }
 ```
 
 Проверить логи:
