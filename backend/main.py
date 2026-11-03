@@ -3,12 +3,8 @@ import logging
 import os
 import re
 import uuid
-from functools import cache
-from typing import Any
 
-import boto3
 import storage
-from botocore.exceptions import ClientError
 from database import get_db_connection
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -59,17 +55,6 @@ workouts: dict[str, dict] = {}
 AUDIO_LANGS = {"ru", "en"}
 AUDIO_KINDS = {"poses", "phrases", "numbers"}
 AUDIO_NAME_RE = re.compile(r"[a-z0-9_]+")
-
-
-@cache
-def get_s3() -> Any:
-    return boto3.client(
-        "s3",
-        endpoint_url=os.environ["MINIO_ENDPOINT"],
-        aws_access_key_id=os.environ["ACCESS_KEY"],
-        aws_secret_access_key=os.environ["SECRET_KEY"],
-        region_name="us-east-1",
-    )
 
 
 def audio_name(name_en: str, audio_url: str | None) -> str:
@@ -254,7 +239,7 @@ def track_event(event: AnalyticsEvent) -> dict[str, str]:
     try:
         user_uuid = uuid.UUID(event.user_id)
         session_uuid = uuid.UUID(event.session_id)
-    except ValueError, AttributeError:
+    except ValueError:
         raise HTTPException(
             status_code=400, detail="user_id и session_id должны быть валидными UUID"
         ) from None
@@ -319,16 +304,14 @@ def get_audio(lang: str, kind: str, name: str) -> StreamingResponse:
     ):
         raise HTTPException(status_code=404, detail="Аудио не найдено")
 
-    key = f"audio/{kind}_{lang}/{name}.mp3"
-    try:
-        obj = get_s3().get_object(Bucket=os.environ["BUCKET_NAME"], Key=key)
-    except ClientError as e:
-        if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
-            raise HTTPException(status_code=404, detail="Аудио не найдено") from e
-        raise
+    audio = storage.get_audio(f"audio/{kind}_{lang}/{name}.mp3")
 
+    if audio is None:
+        raise HTTPException(status_code=404, detail="Аудио не найдено")
+
+    chunks, size = audio
     return StreamingResponse(
-        obj["Body"].iter_chunks(),
+        chunks,
         media_type="audio/mpeg",
-        headers={"Content-Length": str(obj["ContentLength"])},
+        headers={"Content-Length": str(size)},
     )
