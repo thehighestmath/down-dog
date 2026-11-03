@@ -72,6 +72,21 @@ jobs:
             exit 1
           fi
 
+      # При старте стека migrate уже применил все миграции к пустой БД. Второй
+      # запуск - как при каждом деплое на сервер, где БД уже есть: всё должно
+      # пропуститься без ошибок.
+      - name: Re-run migrations
+        run: |
+          echo "ЧТО: повторный запуск migrate.py на уже мигрированной БД."
+          echo "ЗАЧЕМ: так migrate.py запускается при каждом деплое: применённые миграции"
+          echo "       должны пропускаться, а не падать и не применяться второй раз."
+          if ! docker compose run --rm migrate; then
+            echo "::error title=migrate::Повторный запуск миграций упал, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: в логе есть имя миграции и ошибка Postgres. Локально:"
+            echo "  docker compose up -d --wait && docker compose run --rm migrate"
+            exit 1
+          fi
+
       - name: Logs on failure
         if: failure()
         run: docker compose logs

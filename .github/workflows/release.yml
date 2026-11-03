@@ -1,0 +1,101 @@
+name: Release
+
+# Релиз по кнопке: Actions -> Release -> Run workflow (ветка master), ввести
+# версию, например 0.2.0. Workflow:
+# - проверяет, что все проверки на текущем коммите master зелёные;
+# - создаёт тег v<версия> и GitHub Release с автоматическими release notes
+#   (влитые с прошлого релиза ПР, разделы по меткам - см. .github/release.yml);
+# - прикладывает к релизу debug APK down-dog-<версия>.apk.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Версия без v, например 0.2.0 (мажор.минор.патч)'
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Tag, release notes, APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # создать тег и релиз, загрузить APK
+      checks: read # проверить, что CI на коммите зелёный
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Check version and commit
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != refs/heads/master ]; then
+            echo "::error title=release::Релиз делается только из master, а запущен из $GITHUB_REF"
+            exit 1
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error title=release::Версия \"$VERSION\" не в формате мажор.минор.патч, например 0.2.0"
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "::error title=release::Тег v$VERSION уже существует, выбери другую версию"
+            exit 1
+          fi
+
+          # Все проверки коммита, кроме этой джобы, должны закончиться успехом.
+          # $c в одинарных кавычках - переменная jq, не shell
+          # shellcheck disable=SC2016
+          bad=$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs" \
+            --jq '.check_runs[]
+              | select(.name != "Tag, release notes, APK")
+              | select(.conclusion as $c | ["success", "skipped", "neutral"] | index($c) | not)
+              | "\(.name): \(.conclusion // .status)"')
+          if [ -n "$bad" ]; then
+            echo "::error title=release::Не все проверки на коммите ${GITHUB_SHA:0:7} зелёные"
+            echo "$bad"
+            echo "Дождись окончания проверок или почини master, затем запусти релиз снова."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # Без кэша: релизная сборка не должна зависеть от кэша, который мог
+      # записать прогон из любой ветки
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-disabled: true
+
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew --console=plain assembleDebug
+
+      - name: Create release
+        run: |
+          set -euo pipefail
+          apk="$RUNNER_TEMP/down-dog-$VERSION.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$apk"
+          notes="Android: debug-сборка down-dog-$VERSION.apk внизу, в Assets."
+          gh release create "v$VERSION" "$apk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "v$VERSION" \
+            --notes "$notes" \
+            --generate-notes
+          echo "Релиз: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/v$VERSION" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
