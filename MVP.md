@@ -107,7 +107,7 @@
 │  GET  /api/poses                         │
 │  POST /api/workouts/generate             │
 │  GET  /api/workouts/{id}                 │
-│  • при старте применяет backend/sql/*.sql│
+│  • схему готовит сервис migrate          │
 │  • тренировки хранит в памяти процесса   │
 └──────────────────────────────────────────┘
           │                      │
@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS poses (
 | `balancing` | 10     | 2–4       |
 | `cooldown`  | 15     | 1–4       |
 
-Картинки лежат в [`Images/`](Images). Сервис `s3` заливает их в MinIO под тем же именем, а `image_url` проставляет миграция [`03_pose_images.sql`](backend/sql/03_pose_images.sql). Картинки есть у 27 поз; ещё 3 файла (поза героя, поза угла, скрутка сидя) не подходят ни к одной позе из каталога.
+Картинки лежат в [`Images/`](Images). Сервис `s3` заливает их в MinIO под тем же именем, а `image_url` проставляет миграция [`04_update_pose_images.sql`](backend/sql/04_update_pose_images.sql). Миграция [`03_pose_images.sql`](backend/sql/03_pose_images.sql) — её предыдущая версия со старыми именами файлов; её не удаляем, потому что на существующих базах она уже применена.
 
 ### Таблица: `analytics_events`
 

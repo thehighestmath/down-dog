@@ -55,6 +55,7 @@ class WorkoutViewModelTest {
     private class FakeStore(
         var savedCatalog: List<Pose> = emptyList(),
         val savedWorkouts: MutableList<Workout> = mutableListOf(),
+        private val failSaveWorkout: Boolean = false,
     ) : OfflineStore {
         override suspend fun catalog() = savedCatalog
 
@@ -64,7 +65,10 @@ class WorkoutViewModelTest {
 
         override suspend fun workouts() = savedWorkouts.toList()
 
-        override suspend fun saveWorkout(workout: Workout) = savedWorkouts.add(0, workout).let { }
+        override suspend fun saveWorkout(workout: Workout) {
+            if (failSaveWorkout) throw IOException("disk full")
+            savedWorkouts.add(0, workout)
+        }
     }
 
     @Before
@@ -198,6 +202,18 @@ class WorkoutViewModelTest {
         assertEquals(listOf("A", "B"), store.savedCatalog.map { it.nameEn })
         assertEquals(listOf(vm.state.value.workout), store.savedWorkouts)
     }
+
+    @Test
+    fun `failed offline save keeps server workout and does not claim no connection`() =
+        runTest(dispatcher) {
+            val vm = WorkoutViewModel(FakeApi(), FakeStore(failSaveWorkout = true))
+            vm.generate()
+            runCurrent()
+
+            assertEquals("id-1", vm.state.value.workout?.id)
+            assertNull(vm.state.value.error)
+            assertFalse(vm.state.value.notice!!.contains("Нет связи"))
+        }
 
     @Test
     fun `offline catalog comes from the phone`() = runTest(dispatcher) {

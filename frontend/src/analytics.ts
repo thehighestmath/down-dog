@@ -1,4 +1,7 @@
-const API_URL = '/api'
+import { API_URL } from './constants'
+
+const retryDelay = (attempt: number) =>
+  new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)))
 
 function getUserId(): string {
   const key = 'analytics_user_id'
@@ -61,8 +64,9 @@ async function sendEventWithRetry(body: string, maxRetries = 2): Promise<boolean
         console.warn('[analytics] Не удалось отправить событие после повторов:', err)
         return false
       }
-      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)))
     }
+    // 5xx и сетевые ошибки повторяем с паузой, а не сразу подряд
+    if (attempt < maxRetries) await retryDelay(attempt)
   }
   return false
 }
