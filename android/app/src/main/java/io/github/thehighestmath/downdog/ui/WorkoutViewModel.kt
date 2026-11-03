@@ -73,7 +73,7 @@ class WorkoutViewModel(
                     GenerateWorkoutRequest(s.durationMin, s.level.apiValue, s.focus.apiValue),
                 )
                 _state.update { it.copy(workout = workout) }
-                store.saveWorkout(workout)
+                saveForOffline(workout)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {
@@ -189,6 +189,19 @@ class WorkoutViewModel(
             } else {
                 _state.update { it.copy(error = "Не удалось загрузить позы. ${DownDogApi.errorMessage(e)}") }
             }
+        }
+    }
+
+    /**
+     * Кэш для офлайна — не главное: если запись на диск не удалась, тренировка
+     * с сервера уже показана. Нельзя пускать IOException из файловой системы
+     * в catch генерации: там она выглядела бы как «нет связи с сервером».
+     */
+    private suspend fun saveForOffline(workout: Workout) {
+        try {
+            store.saveWorkout(workout)
+        } catch (e: IOException) {
+            _state.update { it.copy(notice = "Тренировку не удалось сохранить для работы без сети.") }
         }
     }
 

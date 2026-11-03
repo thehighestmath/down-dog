@@ -9,10 +9,18 @@ on:
 permissions:
   contents: read
 
+# Новый пуш в тот же ПР отменяет устаревший прогон: не ждём проверок коммита,
+# который уже никому не нужен. Прогоны на master не отменяются - у каждого
+# коммита в master должен быть результат.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     name: Lint + unit tests + build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: android
@@ -44,3 +52,13 @@ jobs:
             echo "  (или в Android Studio: Build > Make Project, Code > Inspect Code)"
             exit 1
           fi
+
+      # APK из этого прогона можно скачать внизу страницы прогона (Artifacts)
+      # и поставить на телефон, не собирая проект локально
+      - name: Upload debug APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: down-dog-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

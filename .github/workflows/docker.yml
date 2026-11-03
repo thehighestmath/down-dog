@@ -9,10 +9,18 @@ on:
 permissions:
   contents: read
 
+# Новый пуш в тот же ПР отменяет устаревший прогон: не ждём проверок коммита,
+# который уже никому не нужен. Прогоны на master не отменяются - у каждого
+# коммита в master должен быть результат.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     name: docker compose build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,6 +77,21 @@ jobs:
             echo "КАК ИСПРАВИТЬ: у каждой строки FAIL есть подсказка, какой сервис смотреть;"
             echo "  логи контейнеров - в шаге Logs on failure. Локально:"
             echo "  docker compose up -d --wait && bash scripts/smoke_test.sh"
+            exit 1
+          fi
+
+      # При старте стека migrate уже применил все миграции к пустой БД. Второй
+      # запуск - как при каждом деплое на сервер, где БД уже есть: всё должно
+      # пропуститься без ошибок.
+      - name: Re-run migrations
+        run: |
+          echo "ЧТО: повторный запуск migrate.py на уже мигрированной БД."
+          echo "ЗАЧЕМ: так migrate.py запускается при каждом деплое: применённые миграции"
+          echo "       должны пропускаться, а не падать и не применяться второй раз."
+          if ! docker compose run --rm migrate; then
+            echo "::error title=migrate::Повторный запуск миграций упал, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: в логе есть имя миграции и ошибка Postgres. Локально:"
+            echo "  docker compose up -d --wait && docker compose run --rm migrate"
             exit 1
           fi
 

@@ -49,15 +49,18 @@ docker compose down -v
 ```text
 down-dog/
 ├── backend/              FastAPI
-│   ├── main.py           эндпоинты и применение миграций при старте
+│   ├── main.py           эндпоинты
+│   ├── migrate.py        раннер миграций (сервис migrate)
+│   ├── storage.py        доступ к MinIO: картинки и озвучка
 │   ├── generator.py      генератор тренировок
 │   ├── *_test.py         тесты (pytest)
 │   └── sql/              миграции и seed-данные
 ├── frontend/             React + TypeScript + Vite, в контейнере — nginx
 │   └── src/components/   экраны: HomeScreen, Player, FinishedScreen
 ├── android/              Android-приложение: Kotlin + Jetpack Compose
-├── s3/                   разовая задача: создаёт бакет и заливает картинки в MinIO
+├── s3/                   разовая задача: создаёт бакет и заливает картинки и озвучку в MinIO
 ├── Images/               картинки поз
+├── audio/                озвучка: названия поз, фразы, числа (ru/en)
 ├── scripts/              смоук-тест стека, проверка сообщений коммитов
 └── docker-compose.yml
 ```
@@ -65,10 +68,11 @@ down-dog/
 Сервисы в `docker-compose.yml`:
 
 - **frontend** — nginx отдаёт собранный фронтенд и проксирует `/api/*` в backend;
-- **backend** — FastAPI; при старте применяет все `backend/sql/*.sql` по алфавиту;
+- **migrate** — запускается один раз: применяет новые `backend/sql/*.sql` по алфавиту (см. [Как выполняются миграции](#как-выполняются-миграции));
+- **backend** — FastAPI, стартует после успешного `migrate`;
 - **db** — PostgreSQL;
 - **minio** — S3-совместимое хранилище;
-- **s3** — запускается один раз: создаёт бакет `down-dog` и заливает туда `Images/`;
+- **s3** — запускается один раз: создаёт бакет `down-dog` и заливает туда `Images/` и `audio/`;
 - **adminer** — веб-интерфейс к базе.
 
 ## Разработка без Docker

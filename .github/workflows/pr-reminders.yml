@@ -1,0 +1,124 @@
+name: PR reminders
+
+# Раз в рабочий день напоминает про зависшие открытые ПР. Никого не закрывает
+# и ничего не блокирует, только пишет комментарий.
+#
+# Ход ревьюера: в ПР висит запрос ревью дольше REVIEW_DAYS дней. Комментарий
+# упоминает тех, у кого запрошено ревью.
+#
+# Ход автора: запроса ревью нет (ревьюер уже ответил, или ПР в черновике),
+# а с последнего коммита или ревью прошло больше AUTHOR_DAYS дней. Комментарий
+# упоминает автора и объясняет, что делать дальше.
+#
+# На одно и то же ожидание напоминание приходит один раз: новый запрос ревью,
+# коммит или ревью начинают новое ожидание. Комментарии пишет github-actions[bot],
+# а не PAT ментора, иначе ментору не пришло бы уведомление об упоминании.
+
+on:
+  schedule:
+    # 09:00 по Москве, пн-пт
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: pr-reminders
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    name: Remind about stale PRs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      REVIEW_DAYS: 2
+      AUTHOR_DAYS: 3
+    steps:
+      - name: Remind
+        run: |
+          set -euo pipefail
+          owner=${REPO%/*}
+          name=${REPO#*/}
+
+          # Строки "<номер>\t<review|author>\t<@упоминания>\t<дней>" для ПР, где пора напомнить.
+          # $-переменные в одинарных кавычках - переменные GraphQL и jq, не shell
+          # shellcheck disable=SC2016
+          todo=$(gh api graphql --paginate \
+            -f owner="$owner" -f name="$name" \
+            -f query='
+              query($owner: String!, $name: String!, $endCursor: String) {
+                repository(owner: $owner, name: $name) {
+                  pullRequests(states: OPEN, first: 50, after: $endCursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      number
+                      isDraft
+                      createdAt
+                      author { login __typename }
+                      reviewRequests(first: 10) {
+                        nodes { requestedReviewer { ... on User { login } } }
+                      }
+                      requested: timelineItems(last: 1, itemTypes: [REVIEW_REQUESTED_EVENT]) {
+                        nodes { ... on ReviewRequestedEvent { createdAt } }
+                      }
+                      ready: timelineItems(last: 1, itemTypes: [READY_FOR_REVIEW_EVENT]) {
+                        nodes { ... on ReadyForReviewEvent { createdAt } }
+                      }
+                      commits(last: 1) { nodes { commit { committedDate } } }
+                      reviews(last: 1) { nodes { submittedAt } }
+                      comments(last: 30) { nodes { body createdAt } }
+                    }
+                  }
+                }
+              }' \
+            --jq '
+              def ts: if . == null then 0 else fromdateiso8601 end;
+              def days_since($t): ((now - $t) / 86400 | floor);
+              # было ли уже напоминание этого вида после момента $since
+              def reminded($kind; $since):
+                [.comments.nodes[]
+                  | select((.body | contains("<!-- pr-reminders:" + $kind + " -->"))
+                      and (.createdAt | ts) >= $since)] | length > 0;
+              .data.repository.pullRequests.nodes[]
+              | [.reviewRequests.nodes[].requestedReviewer.login // empty] as $reviewers
+              | if (.isDraft | not) and ($reviewers | length > 0) then
+                  ([(.requested.nodes[0].createdAt | ts), (.ready.nodes[0].createdAt | ts),
+                    (.createdAt | ts)] | max) as $since
+                  | select(days_since($since) >= (env.REVIEW_DAYS | tonumber)
+                      and (reminded("review"; $since) | not))
+                  | [.number, "review", ($reviewers | map("@" + .) | join(" ")), days_since($since)]
+                elif .author.__typename == "User" then
+                  ([(.commits.nodes[0].commit.committedDate | ts),
+                    (.reviews.nodes[0].submittedAt | ts), (.createdAt | ts)] | max) as $since
+                  | select(days_since($since) >= (env.AUTHOR_DAYS | tonumber)
+                      and (reminded("author"; $since) | not))
+                  | [.number, "author", "@" + .author.login, days_since($since)]
+                else empty end
+              | @tsv')
+
+          sent=0
+          while IFS=$'\t' read -r number kind mentions days; do
+            [ -n "$number" ] || continue
+            body="<!-- pr-reminders:$kind -->"$'\n'
+            if [ "$kind" = review ]; then
+              body+="$mentions, этот ПР ждёт ревью уже $days дн."
+            else
+              body+="$mentions, в этом ПР ничего не происходит уже $days дн. Что дальше:"
+              body+=$'\n'"- если ревьюер оставил замечания: исправь их, ответь в обсуждениях"
+              body+=" и нажми Re-request review рядом с именем ревьюера;"
+              body+=$'\n'"- если ПР в черновике и готов: нажми Ready for review;"
+              body+=$'\n'"- если застрял: напиши в ПР, что не получается, ментор подскажет;"
+              body+=$'\n'"- если ПР больше не нужен: закрой его."
+            fi
+            gh pr comment "$number" -R "$REPO" --body "$body" >/dev/null
+            echo "PR #$number: напоминание ($kind) для $mentions, ждёт $days дн." \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+            sent=$((sent + 1))
+          done <<<"$todo"
+
+          echo "Отправлено напоминаний: $sent" | tee -a "$GITHUB_STEP_SUMMARY"

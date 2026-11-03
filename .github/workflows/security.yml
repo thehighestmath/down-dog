@@ -5,14 +5,25 @@ on:
     branches:
       - master
   pull_request:
+  # Раз в неделю: новая уязвимость в старой зависимости появляется без всякого ПР
+  schedule:
+    - cron: '0 6 * * 1'
 
 permissions:
   contents: read
+
+# Новый пуш в тот же ПР отменяет устаревший прогон: не ждём проверок коммита,
+# который уже никому не нужен. Прогоны на master не отменяются - у каждого
+# коммита в master должен быть результат.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   gitleaks:
     name: Secrets in git history (gitleaks)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -39,6 +50,7 @@ jobs:
   trivy-config:
     name: Dockerfile misconfigurations (trivy)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -56,5 +68,58 @@ jobs:
             echo "::error title=trivy::Опасные настройки в Dockerfile, подробности в логе шага"
             echo "КАК ИСПРАВИТЬ: у замечания есть ID (например DS-0002) и ссылка с примером."
             echo "  Root: создай пользователя (RUN useradd) и переключись на него (USER app)."
+            exit 1
+          fi
+
+  # Не стоит делать обязательной проверкой (required check): свежая уязвимость
+  # в библиотеке иначе заблокирует все ПР, даже не связанные с зависимостями.
+  deps-audit:
+    name: Vulnerable dependencies (pip-audit, npm audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.14'
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+
+      - name: Install pip-audit
+        run: pip install pip-audit==2.10.1
+
+      - name: Python (pip-audit)
+        if: ${{ !cancelled() }}
+        run: |
+          echo "ЧТО: pip-audit - известные уязвимости (CVE) в Python-зависимостях"
+          echo "     бэкенда и скрипта s3 (requirements.txt)."
+          echo "ЗАЧЕМ: уязвимая библиотека - дыра в приложении, даже если наш код идеален."
+          if ! pip-audit -r backend/requirements.txt -r s3/requirements.txt \
+            --desc on --progress-spinner off; then
+            echo "::error title=pip-audit::Уязвимые Python-зависимости, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: в таблице есть пакет и Fix Versions - подними версию"
+            echo "  в requirements.txt до исправленной и проверь, что тесты проходят."
+            echo "  Если исправленной версии ещё нет - сообщи ментору."
+            exit 1
+          fi
+
+      - name: Фронтенд (npm audit)
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: |
+          echo "ЧТО: npm audit - уязвимости HIGH и CRITICAL в зависимостях фронтенда,"
+          echo "     которые попадают в браузер пользователя (без devDependencies)."
+          echo "ЗАЧЕМ: уязвимая библиотека в бандле работает у каждого пользователя."
+          if ! npm audit --omit=dev --audit-level=high; then
+            echo "::error title=npm audit::Уязвимые зависимости фронтенда, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: cd frontend && npm audit fix, затем npm run build и проверь"
+            echo "  приложение. Если нужен --force (мажорное обновление) - согласуй с ментором."
             exit 1
           fi

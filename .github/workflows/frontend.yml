@@ -9,10 +9,18 @@ on:
 permissions:
   contents: read
 
+# Новый пуш в тот же ПР отменяет устаревший прогон: не ждём проверок коммита,
+# который уже никому не нужен. Прогоны на master не отменяются - у каждого
+# коммита в master должен быть результат.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     name: Typecheck + build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: frontend

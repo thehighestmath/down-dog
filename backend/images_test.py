@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from main import app
 from pytest import MonkeyPatch
 
-# TestClient без "with" не запускает lifespan, поэтому база для тестов не нужна
+# storage.get_image подменяется в каждом тесте, MinIO для тестов не нужен
 client = TestClient(app)
 
 

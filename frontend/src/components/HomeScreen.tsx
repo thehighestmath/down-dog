@@ -1,4 +1,5 @@
 import type { FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { DURATIONS, FOCUS_OPTIONS, LEVEL_OPTIONS } from '../constants'
 import type { Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
@@ -41,6 +42,25 @@ export function HomeScreen({
   onSearch,
   onStartWorkout,
 }: HomeScreenProps) {
+  // Показывать предупреждение, пока оно не было увидено раньше
+  const [showWarning] = useState(() => {
+    try {
+      return localStorage.getItem('healthWarningSeen') !== '1'
+    } catch {
+      return true
+    }
+  })
+
+  // Помечаем как просмотренное, когда блок с тренировкой реально появился
+  useEffect(() => {
+    if (!generatedWorkout || !showWarning) return
+    try {
+      localStorage.setItem('healthWarningSeen', '1')
+    } catch {
+      // localStorage недоступен (например, приватный режим), игнорируем
+    }
+  }, [generatedWorkout, showWarning])
+
   return (
     <div className={styles.pageContainer}>
       <h1 className={styles.title}>🧘‍♂️ Генератор Йога-тренировок</h1>
@@ -53,10 +73,8 @@ export function HomeScreen({
           {poses.map((pose) => (
             <div key={pose.id} className={styles.poseItem}>
               <strong>{pose.name_en}</strong>
-              {pose.name_ru && (
-                <div style={{ fontSize: '11px', color: '#888' }}>{pose.name_ru}</div>
-              )}
-              <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+              {pose.name_ru && <div className={styles.poseNameRu}>{pose.name_ru}</div>}
+              <div className={styles.poseMeta}>
                 Сложность: {pose.difficulty} | Цикл: {pose.full_cycle_sec ?? '—'} сек
               </div>
             </div>
@@ -117,7 +135,12 @@ export function HomeScreen({
               ))}
             </select>
           </div>
-          <button type="submit" disabled={loading} style={btnStyle('#646cff')}>
+          <button
+            type="submit"
+            disabled={loading}
+            className={styles.submitButton}
+            style={btnStyle('#646cff')}
+          >
             {loading ? 'Генерация...' : 'Сгенерировать'}
           </button>
         </form>
@@ -135,7 +158,7 @@ export function HomeScreen({
             {generatedWorkout.focus} | {generatedWorkout.duration_min} мин.
           </p>
           <h3>Список поз:</h3>
-          <ol style={{ lineHeight: 1.6 }}>
+          <ol className={styles.poseList}>
             {generatedWorkout.poses.map((p, i) => (
               <li key={i}>{p}</li>
             ))}
@@ -166,6 +189,11 @@ export function HomeScreen({
             >
               Вставить ID в поиск ↓
             </button>
+            {showWarning && (
+              <h2 className={styles.warningText}>
+                ❌ При травмах и заболеваниях нужно проконсультироваться с врачом!
+              </h2>
+            )}
           </div>
         </section>
       )}
@@ -178,12 +206,7 @@ export function HomeScreen({
             value={searchId}
             onChange={(e) => setSearchId(e.target.value)}
             placeholder="Введите UUID тренировки"
-            style={{
-              padding: '8px',
-              flex: 1,
-              borderRadius: 4,
-              border: '1px solid #ccc',
-            }}
+            className={styles.searchInput}
           />
           <button type="submit" disabled={loading} style={btnStyle('#333')}>
             Найти

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { trackPoseViewed } from '../analytics'
-import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
-import { beep, unlockBeep } from '../beep'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
+import { useWakeLock } from '../useWakeLock'
+import { beep, unlockBeep } from '../beep'
+import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
 import styles from './Player.module.css'
 
-const LANG: AudioLang = AudioLang.Ru
+const LANG = AudioLang.Ru
 const BEEP_SECONDS = 3
 
 interface PlayerProps {
@@ -51,22 +52,44 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const [running, setRunning] = useState(true)
   const [confirmStop, setConfirmStop] = useState(false)
   const finishedRef = useRef(false)
+  const baseMsRef = useRef(0)
+  const resumedAtRef = useRef<number | null>(null)
+
+  // Экран не гаснет, пока тренировка идёт (не на паузе)
+  useWakeLock(running)
   const prevPoseIdx = useRef(-1)
   const [audio] = useState(() => new AudioQueue())
 
+  // Очередь озвучки: один экземпляр на время тренировки
   useEffect(() => () => audio.stop(), [audio])
 
+  // Сохранение начала тренировки и обновление таймера
   useEffect(() => {
     if (!running || totalSec === 0) return
-    const id = window.setInterval(() => {
-      setElapsed((e) => Math.min(e + 1, totalSec))
-    }, 1000)
-    return () => window.clearInterval(id)
+    resumedAtRef.current = Date.now()
+    const update = () => {
+      const ms = baseMsRef.current + (Date.now() - (resumedAtRef.current ?? Date.now()))
+      setElapsed(Math.min(Math.floor(ms / 1000), totalSec))
+    }
+
+    const id = window.setInterval(update, 250)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') update()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+      baseMsRef.current += Date.now() - (resumedAtRef.current ?? Date.now())
+    }
   }, [running, totalSec])
 
+  // Завершение: останавливаем очередь и озвучиваем финальную фразу
   useEffect(() => {
     if (totalSec > 0 && elapsed >= totalSec && !finishedRef.current) {
       finishedRef.current = true
+      setRunning(false)
       audio.stop()
       new Audio(phraseUrl(LANG, Phrase.Finish)).play().catch(() => {})
       onFinish()
@@ -90,17 +113,20 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     }
   }
 
+  // Озвучка: вступление к новой позе
   useEffect(() => {
     const item = playlist[currentIdx]
     if (!item || finishedRef.current) return
     audio.play(poseIntroUrls(item, currentIdx === 0, LANG))
   }, [currentIdx, playlist, audio])
 
+  // Пауза и продолжение озвучки вместе с тренировкой
   useEffect(() => {
     if (running) audio.resume()
     else audio.pause()
   }, [running, audio])
 
+  // Напоминание про дыхание на середине длинной позы
   const poseDuration = playlist[currentIdx]?.duration ?? 0
   useEffect(() => {
     if (running && poseDuration >= 30 && timeInPose === Math.floor(poseDuration / 2)) {
@@ -138,6 +164,8 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       return
     }
     const nextStart = poseOffsets[currentIdx + 1] ?? totalSec
+    baseMsRef.current = nextStart * 1000
+    resumedAtRef.current = Date.now()
     setElapsed(nextStart)
   }
 
@@ -159,12 +187,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const ss = String(timeLeft % 60).padStart(2, '0')
   const nextPose = playlist[currentIdx + 1]?.pose
-
-  const imgSrc = current.pose?.image_url
-    ? current.pose.image_url.startsWith('http')
-      ? current.pose.image_url
-      : current.pose.image_url
-    : null
+  const contraindications = current.pose?.contraindications?.trim()
 
   return (
     <div className={styles.container}>
@@ -203,13 +226,13 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       </div>
 
       <div className={styles.imageWrapper}>
-        {imgSrc ? (
+        {current.pose?.image_url ? (
           <img
-            src={imgSrc}
+            className={styles.poseImage}
+            src={current.pose.image_url}
             alt={current.pose?.name_en || current.name}
             loading="eager"
             decoding="async"
-            className={styles.poseImage}
           />
         ) : (
           <div className={styles.imagePlaceholder}>Изображение недоступно</div>
@@ -234,13 +257,18 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         {mm}:{ss}
       </div>
 
+      <div className={styles.nextPose}>
+        {nextPose ? `Далее: ${nextPose.name_ru || nextPose.name_en}` : '\u00a0'}
+      </div>
+
       {current.pose?.description && (
         <div className={styles.descriptionBox}>{current.pose.description}</div>
       )}
 
-      {nextPose && (
-        <div className={styles.nextPose}>
-          Далее: {nextPose.name_ru || nextPose.name_en}
+      {contraindications && contraindications.toLowerCase() !== 'отсутствуют' && (
+        <div className={styles.contraindicationsBox}>
+          <div className={styles.contraindicationsTitle}>⚠ Противопоказания</div>
+          {contraindications}
         </div>
       )}
 
@@ -256,7 +284,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
                 marginTop: '12px',
               }}
             >
-              <button onClick={() => onStop(currentIdx)} style={btnStyle('#c62828')}>
+              <button onClick={() => onStop()} style={btnStyle('#c62828')}>
                 Да, стоп
               </button>
               <button onClick={() => setConfirmStop(false)} style={btnStyle('#444')}>

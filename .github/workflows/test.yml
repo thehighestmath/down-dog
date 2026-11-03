@@ -9,13 +9,24 @@ on:
 permissions:
   contents: read
 
+# Новый пуш в тот же ПР отменяет устаревший прогон: не ждём проверок коммита,
+# который уже никому не нужен. Прогоны на master не отменяются - у каждого
+# коммита в master должен быть результат.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   python:
     name: Python (pytest)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # 2 коммита: в ПР HEAD - тестовый merge-коммит, его первый родитель -
+          # master, с которым сравнивает check_migrations.py
+          fetch-depth: 2
           persist-credentials: false
 
       - name: Set up Python
@@ -30,10 +41,42 @@ jobs:
         run: |
           echo "ЧТО: pytest - автотесты Python (файлы *_test.py и test_*.py)."
           echo "ЗАЧЕМ: тесты подтверждают, что изменение не сломало то, что уже работало."
-          if ! pytest; then
+          if ! pytest --cov; then
             echo "::error title=pytest::Упали тесты, подробности в логе шага"
             echo "КАК ИСПРАВИТЬ: найди в логе FAILED и блок с assert - там ожидаемое"
             echo "  и фактическое значение. Локально: pip install -r backend/requirements-dev.txt"
             echo "  && pytest -x -v. Если поведение поменяли намеренно - обнови тест."
+            exit 1
+          fi
+
+      - name: Покрытие тестами (отчёт)
+        if: ${{ !cancelled() && hashFiles('.coverage') != '' }}
+        run: |
+          {
+            echo "## Покрытие тестами"
+            echo
+            echo "Какая доля строк выполнялась в тестах. Missing - строки, до которых"
+            echo "не дошёл ни один тест: там баг никто не заметит."
+            echo
+            coverage report --format=markdown
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: SQL-миграции
+        if: ${{ !cancelled() }}
+        env:
+          # В push в master пусто: там проверяются только имена файлов
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          echo "ЧТО: имена миграций backend/sql (NN_описание.sql, номера не повторяются);"
+          echo "     в ПР - что миграции из master не изменены и не удалены, а номера"
+          echo "     новых больше последнего номера в master."
+          echo "ЗАЧЕМ: на сервере миграции из master уже применены. Изменённую migrate.py"
+          echo "       откажется запускать, а миграция с номером не по порядку применится"
+          echo "       на сервере и на чистой БД в разном порядке."
+          if ! python scripts/check_migrations.py ${BASE_SHA:+--base "$BASE_SHA"}; then
+            echo "::error title=SQL-миграции::Проблема с миграциями, подробности в логе шага"
+            echo "КАК ИСПРАВИТЬ: верни уже влитые миграции как были, а нужное изменение"
+            echo "  (ALTER TABLE, UPDATE ...) оформи новым файлом со следующим номером."
+            echo "  Локально: python scripts/check_migrations.py --base origin/master"
             exit 1
           fi

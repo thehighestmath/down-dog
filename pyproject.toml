@@ -9,6 +9,15 @@ requires-python = ">=3.14"
 # под двумя именами модуля
 pythonpath = ["backend"]
 
+[tool.coverage.run]
+# Покрытие считается в CI (pytest --cov в test.yml); локально: pytest --cov
+source = ["backend", "s3", "scripts"]
+omit = ["**/*_test.py", "**/test_*.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+
 [tool.mypy]
 python_version = "3.14"
 # Код бэкенда импортирует соседние модули напрямую ("from database import ..."),
