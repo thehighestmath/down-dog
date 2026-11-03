@@ -9,7 +9,6 @@
   isolation: isolate;
 }
 
-/* Фон: fixed-слой вместо background-attachment: fixed (на iOS тот не работает) */
 .home__bg {
   position: fixed;
   inset: 0;
