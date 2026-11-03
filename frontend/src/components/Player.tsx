@@ -152,7 +152,6 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0
   const progress = totalSec > 0 ? elapsed / totalSec : 0
 
-  // Звуковой сигнал в последние секунды позы (по одному разу на каждую секунду)
   // Трекинг смены позы
   useEffect(() => {
     if (currentIdx !== prevPoseIdx.current && current) {
