@@ -61,6 +61,8 @@ export function HomeScreen({
     }
   }, [generatedWorkout, showWarning])
 
+  const isPosesEmpty = !generatedWorkout?.poses || generatedWorkout.poses.length === 0
+
   return (
     <div className={styles.pageContainer}>
       <h1 className={styles.title}>🧘‍♂️ Генератор Йога-тренировок</h1>
@@ -68,7 +70,7 @@ export function HomeScreen({
       {error && <div className={styles.errorBox}>{error}</div>}
 
       <section className={styles.card}>
-        <h2 style={{ marginTop: 0 }}>📚 База поз ({poses.length} шт.)</h2>
+        <h2 className={styles.cardHeading}>📚 База поз ({poses.length} шт.)</h2>
         <div className={styles.posesGrid}>
           {poses.map((pose) => (
             <div key={pose.id} className={styles.poseItem}>
@@ -83,18 +85,10 @@ export function HomeScreen({
       </section>
 
       <section className={styles.card}>
-        <h2 style={{ marginTop: 0 }}>⚙️ Сгенерировать тренировку</h2>
-        <form
-          onSubmit={onGenerate}
-          style={{
-            display: 'flex',
-            gap: '15px',
-            flexWrap: 'wrap',
-            alignItems: 'flex-end',
-          }}
-        >
+        <h2 className={styles.cardHeading}>⚙️ Сгенерировать тренировку</h2>
+        <form onSubmit={onGenerate} className={styles.generateForm}>
           <div className={styles.formRow}>
-            <label style={{ fontWeight: 'bold' }}>Фокус:</label>
+            <label className={styles.formLabel}>Фокус:</label>
             <select
               value={focus}
               onChange={(e) => setFocus(e.target.value)}
@@ -108,7 +102,7 @@ export function HomeScreen({
             </select>
           </div>
           <div className={styles.formRow}>
-            <label style={{ fontWeight: 'bold' }}>Уровень:</label>
+            <label className={styles.formLabel}>Уровень:</label>
             <select
               value={level}
               onChange={(e) => setLevel(e.target.value)}
@@ -122,7 +116,7 @@ export function HomeScreen({
             </select>
           </div>
           <div className={styles.formRow}>
-            <label style={{ fontWeight: 'bold' }}>Длительность (мин):</label>
+            <label className={styles.formLabel}>Длительность (мин):</label>
             <select
               value={durationMin}
               onChange={(e) => setDurationMin(Number(e.target.value))}
@@ -148,7 +142,7 @@ export function HomeScreen({
 
       {generatedWorkout && (
         <section className={styles.cardGenerated}>
-          <h2 style={{ color: '#2e7d32', marginTop: 0 }}>✅ Тренировка готова!</h2>
+          <h2 className={styles.successHeading}>✅ Тренировка готова!</h2>
           <p>
             <strong>ID:</strong>{' '}
             <code className={styles.idCode}>{generatedWorkout.id}</code>
@@ -166,22 +160,14 @@ export function HomeScreen({
           <div className={styles.buttonGroup}>
             <button
               onClick={() => onStartWorkout(generatedWorkout)}
-              disabled={!generatedWorkout.poses || generatedWorkout.poses.length === 0}
+              disabled={isPosesEmpty}
               style={{
                 ...btnStyle('#2e7d32'),
-                opacity:
-                  !generatedWorkout.poses || generatedWorkout.poses.length === 0
-                    ? 0.5
-                    : 1,
-                cursor:
-                  !generatedWorkout.poses || generatedWorkout.poses.length === 0
-                    ? 'not-allowed'
-                    : 'pointer',
+                opacity: isPosesEmpty ? 0.5 : 1,
+                cursor: isPosesEmpty ? 'not-allowed' : 'pointer',
               }}
             >
-              {!generatedWorkout.poses || generatedWorkout.poses.length === 0
-                ? '⚠️ Нет доступных поз'
-                : '▶ Начать тренировку'}
+              {isPosesEmpty ? '⚠️ Нет доступных поз' : '▶ Начать тренировку'}
             </button>
             <button
               onClick={() => setSearchId(generatedWorkout.id)}
@@ -199,8 +185,8 @@ export function HomeScreen({
       )}
 
       <section className={styles.card}>
-        <h2 style={{ marginTop: 0 }}>🔍 Найти тренировку по ID</h2>
-        <form onSubmit={onSearch} style={{ display: 'flex', gap: '10px' }}>
+        <h2 className={styles.cardHeading}>🔍 Найти тренировку по ID</h2>
+        <form onSubmit={onSearch} className={styles.searchForm}>
           <input
             type="text"
             value={searchId}
@@ -215,7 +201,7 @@ export function HomeScreen({
 
         {foundWorkout && (
           <div className={styles.cardFound}>
-            <h3 style={{ color: '#1565c0', marginTop: 0 }}>Найдена тренировка:</h3>
+            <h3 className={styles.foundHeading}>Найдена тренировка:</h3>
             <p>
               <strong>ID:</strong> {foundWorkout.id}
             </p>

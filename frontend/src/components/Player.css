@@ -206,3 +206,33 @@
   flex-wrap: wrap;
   margin-top: 12px;
 }
+
+.player__control-btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.player__control-btn--pause {
+  background-color: #444;
+}
+
+.player__control-btn--skip {
+  background-color: #ff9800;
+}
+
+.player__control-btn--stop {
+  background-color: #c62828;
+}

@@ -189,26 +189,23 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         <div className="player__controls">
           <button
             onClick={() => {
-              unlockBeep() // разблокировка звука браузером требует жеста пользователя
+              unlockBeep()
               setRunning((r) => !r)
             }}
-            className="player__control-btn"
-            style={btnStyle('#444')}
+            className="player__control-btn player__control-btn--pause"
           >
             {running ? '⏸ Пауза' : '▶ Продолжить'}
           </button>
           <button
             onClick={handleSkip}
-            className="player__control-btn"
-            style={btnStyle('#ff9800')}
+            className="player__control-btn player__control-btn--skip"
             title={isLastPose ? 'Завершить тренировку' : 'Пропустить позу'}
           >
             {isLastPose ? '⏭ Завершить' : '⏭ Пропустить'}
           </button>
           <button
             onClick={() => setConfirmStop(true)}
-            className="player__control-btn"
-            style={btnStyle('#c62828')}
+            className="player__control-btn player__control-btn--stop"
           >
             ⏹ Стоп
           </button>
