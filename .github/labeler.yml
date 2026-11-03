@@ -1,0 +1,53 @@
+# Метки области для ПР по изменённым файлам (workflow pr-labels.yml).
+# Метка снимается, если файлы этой области из ПР убрали.
+# Формат: https://github.com/actions/labeler#match-object
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file: ['backend/**', 's3/**']
+
+database:
+  - changed-files:
+      - any-glob-to-any-file:
+          ['backend/sql/**', 'backend/migrate.py', 'backend/database.py']
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: ['frontend/**']
+
+android:
+  - changed-files:
+      - any-glob-to-any-file: ['android/**']
+
+tts:
+  - changed-files:
+      - any-glob-to-any-file: ['audio/**', 'scripts/generate_audio*.py']
+
+docker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/Dockerfile'
+          - '**/.dockerignore'
+          - 'docker-compose*.yml'
+          - 'frontend/nginx.conf'
+
+infrastructure:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - '.pre-commit-config.yaml'
+          - 'scripts/check_commit_msg.py'
+          - 'scripts/smoke_test.sh'
+
+testing:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*_test.py'
+          - '**/test_*.py'
+          - 'android/app/src/test/**'
+          - 'android/app/src/androidTest/**'
+          - 'scripts/smoke_test.sh'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ['**/*.md', 'docs/**']

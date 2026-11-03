@@ -1,0 +1,94 @@
+name: PR labels
+
+# area: метки области по изменённым файлам (backend, frontend, android, ...),
+# правила в .github/labeler.yml.
+#
+# size: метка размера size/XS..size/XL по числу изменённых строк (без
+# lock-файлов). На ПР больше SIZE_XL строк один раз пишет комментарий с
+# советом разбить его: большой ПР дольше ревьюить и в нём легче пропустить баг.
+#
+# Обе метки информационные, мерж они не блокируют.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions: {}
+
+concurrency:
+  group: pr-labels-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  area:
+    name: Area labels
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          sync-labels: true
+
+  size:
+    name: Size label
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      SIZE_XL: 400
+    steps:
+      - name: Sync size label
+        run: |
+          set -euo pipefail
+
+          # Сгенерированные lock-файлы не ревьюят построчно - не считаем их
+          lines=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files?per_page=100" \
+            --jq '.[] | select(.filename | test("(^|/)(package-lock[.]json|[^/]*[.]lockfile)$") | not)
+              | .additions + .deletions' | awk '{s += $1} END {print s + 0}')
+
+          if [ "$lines" -le 10 ]; then size=XS
+          elif [ "$lines" -le 50 ]; then size=S
+          elif [ "$lines" -le 200 ]; then size=M
+          elif [ "$lines" -le "$SIZE_XL" ]; then size=L
+          else size=XL
+          fi
+          label="size/$size"
+          echo "PR #$PR_NUMBER: $lines строк -> $label" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          existing=$(gh label list -R "$REPO" --limit 500 --json name --jq '.[].name')
+          if ! grep -Fxq "$label" <<<"$existing"; then
+            case "$size" in
+              XS|S) color=0e8a16 ;; M) color=fbca04 ;; L) color=f9a825 ;; *) color=d93f0b ;;
+            esac
+            gh label create "$label" -R "$REPO" --color "$color" \
+              --description "Changed lines (without lock files), see pr-labels.yml" >/dev/null
+          fi
+
+          # Снимаем прежнюю метку размера, если ПР вырос или уменьшился
+          current=$(gh pr view "$PR_NUMBER" -R "$REPO" --json labels --jq '.labels[].name')
+          args=(--add-label "$label")
+          while read -r old; do
+            if [[ "$old" == size/* && "$old" != "$label" ]]; then
+              args+=(--remove-label "$old")
+            fi
+          done <<<"$current"
+          gh pr edit "$PR_NUMBER" -R "$REPO" "${args[@]}" >/dev/null
+
+          # Совет разбить ПР - один раз за всю жизнь ПР
+          marker='<!-- pr-labels:size-xl -->'
+          if [ "$size" = XL ] && ! gh pr view "$PR_NUMBER" -R "$REPO" --json comments \
+              --jq '.comments[].body' | grep -Fq "$marker"; then
+            body="$marker"$'\n'"В этом ПР $lines изменённых строк (больше $SIZE_XL без lock-файлов)."
+            body+=$'\n\n'"Большой ПР дольше ревьюить, а баг в нём легче пропустить. Если получится,"
+            body+=" разбей его на несколько ПР поменьше: например, отдельно рефакторинг,"
+            body+=" отдельно новая функциональность, отдельно бэкенд и фронтенд."
+            body+=" Если разбить нельзя, напиши в описании ПР, в каком порядке его смотреть."
+            gh pr comment "$PR_NUMBER" -R "$REPO" --body "$body" >/dev/null
+          fi

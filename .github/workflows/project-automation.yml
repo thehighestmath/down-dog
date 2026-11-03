@@ -40,6 +40,7 @@ jobs:
   review-rollback:
     name: Roll back In Review issues without a linked PR
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       # Нужен classic PAT со scope project и repo
       GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
@@ -150,6 +151,7 @@ jobs:
     needs: review-rollback
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       # GITHUB_TOKEN не видит пользовательские проекты: нужен classic PAT со scope project
       GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
@@ -238,6 +240,7 @@ jobs:
   assignees:
     name: Label issues with several assignees
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       # Для меток PAT нужен ещё и scope repo
       GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
@@ -304,6 +307,7 @@ jobs:
   deadline:
     name: Label overdue issues
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       # Для меток PAT нужен ещё и scope repo
       GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
@@ -381,6 +385,7 @@ jobs:
   linked-issue:
     name: Label PRs without a linked issue
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     env:
       # Для меток PAT нужен scope repo
       GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
