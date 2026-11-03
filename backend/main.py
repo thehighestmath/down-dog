@@ -14,11 +14,25 @@ from pydantic import BaseModel
 
 logger = logging.getLogger("app")
 
+
+def parse_cors_origins(value: str | None) -> list[str]:
+    """Read allowed browser origins from CORS_ORIGINS (comma-separated).
+
+    When the variable is unset or empty, allow any origin (`*`) so local
+    `docker compose up` / `npm run dev` work without extra config. Production
+    should set CORS_ORIGINS to an explicit list (see README).
+    """
+    if value is None or not value.strip():
+        return ["*"]
+    origins = [part.strip() for part in value.split(",") if part.strip()]
+    return origins or ["*"]
+
+
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # для разработки; в проде укажи свой домен
+    allow_origins=parse_cors_origins(os.environ.get("CORS_ORIGINS")),
     allow_credentials=False,  # "*" + credentials=True нельзя вместе
     allow_methods=["*"],
     allow_headers=["*"],
