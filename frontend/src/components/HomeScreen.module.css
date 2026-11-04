@@ -1,0 +1,127 @@
+.pageContainer {
+  padding: 20px;
+  font-family: sans-serif;
+  max-width: 900px;
+  margin: 0 auto;
+  color: #333;
+  min-height: 100vh;
+  background-image: url('/bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+.title {
+  text-align: center;
+  color: #fff;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.errorBox {
+  color: #d32f2f;
+  padding: 15px;
+  background: rgba(255, 235, 238, 0.95);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-weight: bold;
+}
+
+.card {
+  margin-bottom: 24px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.cardHeading {
+  margin-top: 0;
+}
+
+.successHeading {
+  color: #2e7d32;
+  margin-top: 0;
+}
+
+.foundHeading {
+  color: #1565c0;
+  margin-top: 0;
+}
+
+.cardGenerated {
+  margin-bottom: 24px;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 2px solid #4caf50;
+  background: rgba(232, 245, 233, 0.95);
+}
+
+.cardFound {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(227, 242, 253, 0.95);
+  border-radius: 8px;
+  border: 1px solid #90caf9;
+}
+
+.posesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.poseItem {
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: white;
+}
+
+/* Новые классы взамен инлайн-стилей формы генерации */
+.generateForm {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.searchForm {
+  display: flex;
+  gap: 10px;
+}
+
+.formRow {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.formLabel {
+  font-weight: bold;
+}
+
+.formSelect,
+.formInput,
+.searchInput {
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+.idCode {
+  background: #e0e0e0;
+  color: #d32f2f;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}

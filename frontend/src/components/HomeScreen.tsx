@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { DURATIONS, FOCUS_OPTIONS, LEVEL_OPTIONS } from '../constants'
 import type { Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
-import './HomeScreen.css'
+import styles from './HomeScreen.module.css'
 
 interface HomeScreenProps {
   poses: Pose[]
@@ -61,21 +61,22 @@ export function HomeScreen({
     }
   }, [generatedWorkout, showWarning])
 
+  const isPosesEmpty = !generatedWorkout?.poses || generatedWorkout.poses.length === 0
+
   return (
-    <div className="home">
-      <div className="home__bg" aria-hidden="true" />
-      <h1 className="home__title">🧘‍♂️ Генератор Йога-тренировок</h1>
+    <div className={styles.pageContainer}>
+      <h1 className={styles.title}>🧘‍♂️ Генератор Йога-тренировок</h1>
 
-      {error && <div className="home__error">{error}</div>}
+      {error && <div className={styles.errorBox}>{error}</div>}
 
-      <section className="home__card">
-        <h2 className="home__card-title">📚 База поз ({poses.length} шт.)</h2>
-        <div className="home__pose-grid">
+      <section className={styles.card}>
+        <h2 className={styles.cardHeading}>📚 База поз ({poses.length} шт.)</h2>
+        <div className={styles.posesGrid}>
           {poses.map((pose) => (
-            <div key={pose.id} className="home__pose-item">
+            <div key={pose.id} className={styles.poseItem}>
               <strong>{pose.name_en}</strong>
-              {pose.name_ru && <div className="home__pose-name-ru">{pose.name_ru}</div>}
-              <div className="home__pose-meta">
+              {pose.name_ru && <div className={styles.poseNameRu}>{pose.name_ru}</div>}
+              <div className={styles.poseMeta}>
                 Сложность: {pose.difficulty} | Цикл: {pose.full_cycle_sec ?? '—'} сек
               </div>
             </div>
@@ -83,15 +84,15 @@ export function HomeScreen({
         </div>
       </section>
 
-      <section className="home__card">
-        <h2 className="home__card-title">⚙️ Сгенерировать тренировку</h2>
-        <form onSubmit={onGenerate} className="home__form">
-          <div className="home__field">
-            <label className="home__label">Фокус:</label>
+      <section className={styles.card}>
+        <h2 className={styles.cardHeading}>⚙️ Сгенерировать тренировку</h2>
+        <form onSubmit={onGenerate} className={styles.generateForm}>
+          <div className={styles.formRow}>
+            <label className={styles.formLabel}>Фокус:</label>
             <select
               value={focus}
               onChange={(e) => setFocus(e.target.value)}
-              className="home__input"
+              className={styles.formSelect}
             >
               {FOCUS_OPTIONS.map(({ value, label }) => (
                 <option key={value} value={value}>
@@ -100,12 +101,12 @@ export function HomeScreen({
               ))}
             </select>
           </div>
-          <div className="home__field">
-            <label className="home__label">Уровень:</label>
+          <div className={styles.formRow}>
+            <label className={styles.formLabel}>Уровень:</label>
             <select
               value={level}
               onChange={(e) => setLevel(e.target.value)}
-              className="home__input"
+              className={styles.formSelect}
             >
               {LEVEL_OPTIONS.map(({ value, label }) => (
                 <option key={value} value={value}>
@@ -114,12 +115,12 @@ export function HomeScreen({
               ))}
             </select>
           </div>
-          <div className="home__field">
-            <label className="home__label">Длительность (мин):</label>
+          <div className={styles.formRow}>
+            <label className={styles.formLabel}>Длительность (мин):</label>
             <select
               value={durationMin}
               onChange={(e) => setDurationMin(Number(e.target.value))}
-              className="home__input"
+              className={styles.formSelect}
             >
               {DURATIONS.map((min) => (
                 <option key={min} value={min}>
@@ -131,7 +132,7 @@ export function HomeScreen({
           <button
             type="submit"
             disabled={loading}
-            className="home__submit"
+            className={styles.submitButton}
             style={btnStyle('#646cff')}
           >
             {loading ? 'Генерация...' : 'Сгенерировать'}
@@ -140,29 +141,33 @@ export function HomeScreen({
       </section>
 
       {generatedWorkout && (
-        <section className="home__card home__card--generated">
-          <h2 className="home__card-title home__card-title--success">
-            ✅ Тренировка готова!
-          </h2>
+        <section className={styles.cardGenerated}>
+          <h2 className={styles.successHeading}>✅ Тренировка готова!</h2>
           <p>
-            <strong>ID:</strong> <code className="home__id">{generatedWorkout.id}</code>
+            <strong>ID:</strong>{' '}
+            <code className={styles.idCode}>{generatedWorkout.id}</code>
           </p>
           <p>
             <strong>Параметры:</strong> {generatedWorkout.level} |{' '}
             {generatedWorkout.focus} | {generatedWorkout.duration_min} мин.
           </p>
           <h3>Список поз:</h3>
-          <ol className="home__pose-list">
+          <ol className={styles.poseList}>
             {generatedWorkout.poses.map((p, i) => (
               <li key={i}>{p}</li>
             ))}
           </ol>
-          <div className="home__actions">
+          <div className={styles.buttonGroup}>
             <button
               onClick={() => onStartWorkout(generatedWorkout)}
-              style={btnStyle('#2e7d32')}
+              disabled={isPosesEmpty}
+              style={{
+                ...btnStyle('#2e7d32'),
+                opacity: isPosesEmpty ? 0.5 : 1,
+                cursor: isPosesEmpty ? 'not-allowed' : 'pointer',
+              }}
             >
-              ▶ Начать тренировку
+              {isPosesEmpty ? '⚠️ Нет доступных поз' : '▶ Начать тренировку'}
             </button>
             <button
               onClick={() => setSearchId(generatedWorkout.id)}
@@ -171,23 +176,23 @@ export function HomeScreen({
               Вставить ID в поиск ↓
             </button>
             {showWarning && (
-              <h2 className="home__warning">
-                ❌При травмах и заболеваниях нужно проконсультироваться с врачом!
+              <h2 className={styles.warningText}>
+                ❌ При травмах и заболеваниях нужно проконсультироваться с врачом!
               </h2>
             )}
           </div>
         </section>
       )}
 
-      <section className="home__card">
-        <h2 className="home__card-title">🔍 Найти тренировку по ID</h2>
-        <form onSubmit={onSearch} className="home__search-form">
+      <section className={styles.card}>
+        <h2 className={styles.cardHeading}>🔍 Найти тренировку по ID</h2>
+        <form onSubmit={onSearch} className={styles.searchForm}>
           <input
             type="text"
             value={searchId}
             onChange={(e) => setSearchId(e.target.value)}
             placeholder="Введите UUID тренировки"
-            className="home__input home__search-input"
+            className={styles.searchInput}
           />
           <button type="submit" disabled={loading} style={btnStyle('#333')}>
             Найти
@@ -195,9 +200,9 @@ export function HomeScreen({
         </form>
 
         {foundWorkout && (
-          <div className="home__found">
-            <h3 className="home__found-title">Найдена тренировка:</h3>
-            <p className="home__found-id">
+          <div className={styles.cardFound}>
+            <h3 className={styles.foundHeading}>Найдена тренировка:</h3>
+            <p>
               <strong>ID:</strong> {foundWorkout.id}
             </p>
             <p>

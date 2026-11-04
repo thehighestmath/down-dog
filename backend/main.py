@@ -186,6 +186,20 @@ def generate_workout(request: WorkoutRequest) -> dict:
     )
 
     # -------------------------------------
+    # Проверяем, удалось ли сгенерировать позы
+    # -------------------------------------
+
+    if not workout_poses:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Не удалось подобрать позы для выбранных параметров. "
+                "В будущих обновлениях мы сделаем подбор более гибким."
+                "Попробуйте снизить уровень сложности или выбрать другой фокус."
+            ),
+        )
+
+    # -------------------------------------
     # Создаём ID
     # -------------------------------------
 
@@ -219,6 +233,12 @@ def get_workout(workout_id: str) -> dict:
 
     if workout is None:
         raise HTTPException(status_code=404, detail="Тренировка не найдена")
+
+    if not workout.get("poses"):
+        raise HTTPException(
+            status_code=400,
+            detail="Тренировка не содержит упражнений. Пожалуйста, сгенерируйте новую.",
+        )
 
     return workout
 
