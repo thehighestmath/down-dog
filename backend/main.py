@@ -3,10 +3,12 @@ import logging
 import os
 import re
 import uuid
+from typing import Annotated
 
 import storage
+from analytics import MAX_BODY_BYTES, AnalyticsEvent
 from database import get_db_connection
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from generator import get_poses_by_focus, tren
@@ -98,13 +100,6 @@ class WorkoutRequest(BaseModel):
     duration_min: int
     level: str
     focus: str
-
-
-class AnalyticsEvent(BaseModel):
-    event_type: str
-    user_id: str
-    session_id: str
-    payload: dict | None = None
 
 
 # =========================================
@@ -243,28 +238,25 @@ def get_workout(workout_id: str) -> dict:
     return workout
 
 
-ALLOWED_EVENT_TYPES = (
-    "workout_started",
-    "workout_completed",
-    "workout_abandoned",
-    "pose_viewed",
-)
-
-
-@app.post("/api/analytics/track")
-def track_event(event: AnalyticsEvent) -> dict[str, str]:
-    if event.event_type not in ALLOWED_EVENT_TYPES:
-        raise HTTPException(status_code=400, detail="Недопустимый event_type")
-
-    try:
-        user_uuid = uuid.UUID(event.user_id)
-        session_uuid = uuid.UUID(event.session_id)
-    except ValueError:
+async def limit_body_size(request: Request) -> None:
+    if len(await request.body()) > MAX_BODY_BYTES:
         raise HTTPException(
-            status_code=400, detail="user_id и session_id должны быть валидными UUID"
-        ) from None
+            status_code=413, detail=f"Событие больше {MAX_BODY_BYTES} байт"
+        )
 
-    logger.info("Event: %s", json.dumps(event.model_dump()))
+
+@app.post("/api/analytics/track", dependencies=[Depends(limit_body_size)])
+def track_event(
+    event: Annotated[AnalyticsEvent, Body(discriminator="event_type")],
+) -> dict[str, str]:
+    payload = event.payload.model_dump(mode="json", exclude_none=True)
+
+    logging.info(
+        "Event %s session=%s fields=%s",
+        event.event_type,
+        event.session_id,
+        sorted(payload),
+    )
 
     conn = get_db_connection()
     try:
@@ -276,9 +268,9 @@ def track_event(event: AnalyticsEvent) -> dict[str, str]:
                 """,
                 (
                     event.event_type,
-                    str(user_uuid),
-                    str(session_uuid),
-                    json.dumps(event.payload or {}),
+                    str(event.user_id),
+                    str(event.session_id),
+                    json.dumps(payload),
                 ),
             )
         conn.commit()
