@@ -60,6 +60,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   useWakeLock(running)
   const prevPoseIdx = useRef(-1)
   const [audio] = useState(() => new AudioQueue())
+  const [brokenImage, setBrokenImage] = useState<string | null>(null)
 
   // Очередь озвучки: один экземпляр на время тренировки
   // При выходе с экрана (стоп, финиш) озвучка замолкает и очередь сбрасывается
@@ -174,6 +175,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   }
 
   if (!current) return null
+  const imageUrl = current.pose?.image_url
 
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const ss = String(timeLeft % 60).padStart(2, '0')
@@ -219,13 +221,14 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       </div>
 
       <div className="player__image-wrap">
-        {current.pose?.image_url ? (
+        {imageUrl && imageUrl !== brokenImage ? (
           <img
             className="player__image"
-            src={current.pose.image_url}
+            src={imageUrl}
             alt={current.pose?.name_en || current.name}
             loading="eager"
             decoding="async"
+            onError={() => setBrokenImage(imageUrl)}
           />
         ) : (
           <div className="player__image-placeholder">Изображение недоступно</div>

@@ -87,6 +87,30 @@ else
   ok "s3: загрузка картинок ($(grep -c '✅ Загружено' <<< "$s3_out") файлов)"
 fi
 
+echo "--- Картинки поз"
+check_image() {
+  local name=$1 url=$2 hint=$3 resp
+  resp=$(curl --silent --max-time 10 --retry 5 --retry-delay 2 --retry-all-errors \
+    -o /dev/null -w '%{http_code} %{content_type}' "$url")
+  if [[ $resp == "200 image/"* ]]; then
+    ok "$name"
+  else
+    fail "$name" "$hint (ответ: ${resp:-нет ответа})"
+  fi
+}
+
+image_url=$(curl --fail --silent --max-time 10 "$BACKEND_URL/api/poses" |
+  grep -o '"image_url":"[^"]*"' | head -n 1 | cut -d'"' -f4)
+if [ -z "$image_url" ]; then
+  fail "картинки: image_url в /api/poses" \
+    "ни у одной позы нет image_url - не применилась миграция с картинками"
+else
+  check_image "картинки: $image_url через бэкенд" "$BACKEND_URL$image_url" \
+    "бэкенд не отдаёт картинку - нет файла в MinIO или в Images/"
+  check_image "картинки: $image_url через nginx" "$FRONTEND_URL$image_url" \
+    "nginx не проксирует картинку - смотри location /api/ в frontend/nginx.conf"
+fi
+
 if [ "$failed" -ne 0 ]; then
   echo
   echo "Смоук-тест не пройден: см. строки FAIL выше."
