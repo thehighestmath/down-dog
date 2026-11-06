@@ -25,6 +25,10 @@ jobs:
   release:
     name: Tag, release notes, APK
     runs-on: ubuntu-latest
+    # Запустить workflow может любой с правами на запись, но джоба ждёт
+    # подтверждения ментора (Settings -> Environments -> release: required
+    # reviewer, только ветка master). Без этого тег v* мог бы выпустить кто угодно.
+    environment: release
     timeout-minutes: 30
     permissions:
       contents: write # создать тег и релиз, загрузить APK
