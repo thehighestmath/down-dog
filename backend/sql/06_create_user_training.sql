@@ -13,4 +13,3 @@ CREATE TABLE IF NOT EXISTS workouts (
 
 COMMENT ON TABLE workouts IS 'Сгенерированные тренировки';
 COMMENT ON COLUMN workouts.poses IS 'Упорядоченный JSON-массив названий поз (name_en)';
-

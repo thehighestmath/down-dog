@@ -1,9 +1,8 @@
 from typing import Any
 from uuid import UUID
 
-from psycopg2.extras import Json
-
 from database import get_db_connection
+from psycopg2.extras import Json
 
 
 def save_workout(
