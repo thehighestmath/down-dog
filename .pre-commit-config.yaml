@@ -121,3 +121,13 @@ repos:
         entry: python scripts/check_commit_msg.py
         language: python
         stages: [commit-msg]
+
+      # <type>/<kebab-case>, e.g. feat/timer-beep. Runs on every commit, not
+      # on push, so nobody has to re-run `pre-commit install`. Skips master
+      # and detached HEAD (CI checks out PRs detached).
+      - id: branch-name
+        name: branch name is <type>/<kebab-case>
+        entry: python scripts/check_branch_name.py
+        language: python
+        pass_filenames: false
+        always_run: true
