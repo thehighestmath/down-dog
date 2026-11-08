@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { trackPoseViewed } from '../analytics'
 import type { PlaylistItem, Pose, Workout } from '../types'
 import { btnStyle } from '../utils/styles'
@@ -52,6 +52,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const [elapsed, setElapsed] = useState(0)
   const [running, setRunning] = useState(true)
   const [confirmStop, setConfirmStop] = useState(false)
+  const [finished, setFinished] = useState(false)
   const finishedRef = useRef(false)
   const baseMsRef = useRef(0)
   const resumedAtRef = useRef<number | null>(null)
@@ -60,7 +61,19 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   useWakeLock(running)
   const prevPoseIdx = useRef(-1)
   const [audio] = useState(() => new AudioQueue())
+  const [brokenImage, setBrokenImage] = useState<string | null>(null)
 
+  const finish = useCallback(() => {
+    if (finishedRef.current) return
+    finishedRef.current = true
+    setFinished(true)
+    setRunning(false)
+    audio.stop()
+    new Audio(phraseUrl(LANG, Phrase.Finish)).play().catch(() => {})
+    onFinish()
+  }, [audio, LANG, onFinish])
+
+  const introIdxRef = useRef(-1)
   // Очередь озвучки: один экземпляр на время тренировки
   // При выходе с экрана (стоп, финиш) озвучка замолкает и очередь сбрасывается
   useEffect(() => () => audio.stop(), [audio])
@@ -90,14 +103,11 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   // Завершение: останавливаем очередь и озвучиваем финальную фразу
   useEffect(() => {
     if (totalSec > 0 && elapsed >= totalSec && !finishedRef.current) {
-      finishedRef.current = true
-      setRunning(false)
-      audio.stop()
-      new Audio(phraseUrl(LANG, Phrase.Finish)).play().catch(() => {})
-      onFinish()
+      finish()
     }
-  }, [elapsed, totalSec, onFinish, audio, LANG])
+  }, [elapsed, totalSec, audio, LANG, finish])
 
+  // Текущая поза
   let acc = 0
   let currentIdx = 0
   let timeInPose = 0
@@ -117,10 +127,13 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
 
   // Озвучка: вступление к новой позе
   useEffect(() => {
+    if (!running || finishedRef.current) return
+    if (introIdxRef.current === currentIdx) return
     const item = playlist[currentIdx]
-    if (!item || finishedRef.current) return
+    if (!item) return
+    introIdxRef.current = currentIdx
     audio.play(poseIntroUrls(item, currentIdx === 0, LANG))
-  }, [currentIdx, playlist, audio, LANG])
+  }, [currentIdx, running, playlist, audio, LANG])
 
   // Пауза и продолжение озвучки вместе с тренировкой
   useEffect(() => {
@@ -140,7 +153,6 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const timeLeft = current ? Math.max(0, current.duration - timeInPose) : 0
   const progress = totalSec > 0 ? elapsed / totalSec : 0
 
-  // Звуковой сигнал в последние секунды позы (по одному разу на каждую секунду)
   // Трекинг смены позы
   useEffect(() => {
     if (currentIdx !== prevPoseIdx.current && current) {
@@ -163,8 +175,8 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
 
   // Пропустить текущую позу
   const handleSkip = () => {
-    if (isLastPose) {
-      onStop(currentIdx)
+    if (isLastPose && totalSec > 0) {
+      finish()
       return
     }
     const nextStart = poseOffsets[currentIdx + 1] ?? totalSec
@@ -174,6 +186,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   }
 
   if (!current) return null
+  const imageUrl = current.pose?.image_url
 
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const ss = String(timeLeft % 60).padStart(2, '0')
@@ -189,7 +202,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
         <div className="player__controls">
           <button
             onClick={() => {
-              unlockBeep()
+              unlockBeep() // разблокировка звука браузером требует жеста пользователя
               setRunning((r) => !r)
             }}
             className="player__control-btn player__control-btn--pause"
@@ -198,6 +211,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
           </button>
           <button
             onClick={handleSkip}
+            disabled={finished}
             className="player__control-btn player__control-btn--skip"
             title={isLastPose ? 'Завершить тренировку' : 'Пропустить позу'}
           >
@@ -219,13 +233,14 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
       </div>
 
       <div className="player__image-wrap">
-        {current.pose?.image_url ? (
+        {imageUrl && imageUrl !== brokenImage ? (
           <img
             className="player__image"
-            src={current.pose.image_url}
+            src={imageUrl}
             alt={current.pose?.name_en || current.name}
             loading="eager"
             decoding="async"
+            onError={() => setBrokenImage(imageUrl)}
           />
         ) : (
           <div className="player__image-placeholder">Изображение недоступно</div>
@@ -269,7 +284,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
           <div className="player__modal">
             <p className="player__modal-text">Завершить тренировку досрочно?</p>
             <div className="player__modal-actions">
-              <button onClick={() => onStop()} style={btnStyle('#c62828')}>
+              <button onClick={() => onStop(currentIdx)} style={btnStyle('#c62828')}>
                 Да, стоп
               </button>
               <button onClick={() => setConfirmStop(false)} style={btnStyle('#444')}>

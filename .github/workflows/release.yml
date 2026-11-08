@@ -25,6 +25,10 @@ jobs:
   release:
     name: Tag, release notes, APK
     runs-on: ubuntu-latest
+    # Запустить workflow может любой с правами на запись, но джоба ждёт
+    # подтверждения ментора (Settings -> Environments -> release: required
+    # reviewer, только ветка master). Без этого тег v* мог бы выпустить кто угодно.
+    environment: release
     timeout-minutes: 30
     permissions:
       contents: write # создать тег и релиз, загрузить APK
@@ -77,7 +81,7 @@ jobs:
       # Без кэша: релизная сборка не должна зависеть от кэша, который мог
       # записать прогон из любой ветки
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-disabled: true
 
