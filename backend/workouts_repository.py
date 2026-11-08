@@ -3,9 +3,8 @@ from typing import Any
 from uuid import UUID
 
 import psycopg2
-from psycopg2.extras import Json
-
 from database import get_db_connection
+from psycopg2.extras import Json
 
 logger = logging.getLogger("app.repo.workouts")
 
@@ -16,7 +15,7 @@ def _db_error_fields(exc: BaseException) -> dict[str, Any]:
         return {}
     diag = getattr(exc, "diag", None)
     return {
-        "sqlstate": exc.pgcode,                         # '22P02', '23505', ...
+        "sqlstate": exc.pgcode,  # '22P02', '23505', ...
         "constraint": getattr(diag, "constraint_name", None),
         "message": getattr(diag, "message_primary", str(exc)),
     }
@@ -45,7 +44,11 @@ def save_workout(
         logger.exception(
             "workout insert failed id=%s level=%s focus=%s duration_min=%s "
             "poses_count=%d sqlstate=%s constraint=%s",
-            workout_id, level, focus, duration_min, len(poses),
+            workout_id,
+            level,
+            focus,
+            duration_min,
+            len(poses),
             getattr(exc, "pgcode", None),
             getattr(getattr(exc, "diag", None), "constraint_name", None),
         )
@@ -75,7 +78,8 @@ def get_workout_by_id(workout_id: UUID) -> dict[str, Any] | None:
     except Exception as exc:
         logger.exception(
             "workout select failed id=%s sqlstate=%s",
-            workout_id, getattr(exc, "pgcode", None),
+            workout_id,
+            getattr(exc, "pgcode", None),
         )
         raise
     finally:
