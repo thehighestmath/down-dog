@@ -13,6 +13,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
+from workouts_repository import (
+    get_workout_by_id,
+    save_workout,
+)
 
 logger = logging.getLogger("app")
 
@@ -42,12 +46,6 @@ def health_check() -> dict[str, str]:
         if conn is not None:
             conn.close()
 
-
-# -----------------------------------------
-# Временное хранилище тренировок
-# -----------------------------------------
-
-workouts: dict[str, dict] = {}
 
 # -----------------------------------------
 # S3 (MinIO): озвучка
@@ -212,7 +210,13 @@ def generate_workout(request: WorkoutRequest) -> dict:
         "poses": workout_poses,
     }
 
-    workouts[workout_id] = workout
+    save_workout(
+        workout_id=workout_id,
+        duration_min=request.duration_min,
+        level=request.level,
+        focus=request.focus,
+        poses=workout_poses,
+    )
 
     return workout
 
@@ -224,10 +228,21 @@ def generate_workout(request: WorkoutRequest) -> dict:
 
 @app.get("/api/workouts/{workout_id}")
 def get_workout(workout_id: str) -> dict:
-    workout = workouts.get(workout_id)
+    try:
+        parsed_id = uuid.UUID(workout_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=404,
+            detail="Тренировка не найдена",
+        ) from None
+
+    workout = get_workout_by_id(parsed_id)
 
     if workout is None:
-        raise HTTPException(status_code=404, detail="Тренировка не найдена")
+        raise HTTPException(
+            status_code=404,
+            detail="Тренировка не найдена",
+        )
 
     if not workout.get("poses"):
         raise HTTPException(
