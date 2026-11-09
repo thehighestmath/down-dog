@@ -95,6 +95,13 @@ jobs:
             exit 1
           fi
 
+      - name: Run workout duplicate integration tests
+        run: |
+          echo "ЧТО: проверка отсутствия повторяющихся поз во всех вариантах тренировок."
+          echo "ЗАЧЕМ: тест выполняется внутри контейнера backend с установленными зависимостями."
+          docker compose exec --user 0 -T backend sh -c \
+            "python -m pip install pytest && python -m pytest -v -rA --tb=short /app/test_workout_duplicates.py"
+
       - name: Logs on failure
         if: failure()
         run: docker compose logs
