@@ -7,9 +7,9 @@ from typing import Annotated
 
 import storage
 from analytics import MAX_BODY_BYTES, AnalyticsEvent
+from cors import setup_cors
 from database import get_db_connection
 from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
@@ -21,14 +21,7 @@ from workouts_repository import (
 logger = logging.getLogger("app")
 
 app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # для разработки; в проде укажи свой домен
-    allow_credentials=False,  # "*" + credentials=True нельзя вместе
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+setup_cors(app)
 
 
 @app.get("/health")

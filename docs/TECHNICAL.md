@@ -7,6 +7,7 @@
 - [MinIO](#minio)
 - [Картинки поз](#картинки-поз)
 - [FastAPI](#fastapi)
+- [CORS](#cors-cors_origins)
 
 ---
 
@@ -369,3 +370,40 @@ http://127.0.0.1:8000
    │
    └── Swagger → /docs
 ```
+
+## CORS (`CORS_ORIGINS`)
+
+Бэкенд разрешает запросы из браузера с чужих origins только для адресов из переменной окружения `CORS_ORIGINS` (см. `backend/cors.py`).
+
+**Формат:** origins через запятую, без путей. Пробелы вокруг значений и слэш в конце игнорируются.
+
+```dotenv
+CORS_ORIGINS=https://down-dog.example.com,https://admin.example.com
+```
+
+Origin — это схема, хост и порт: `https://site.com` и `http://site.com` считаются разными.
+
+**Если переменная не задана или пуста**, разрешены только адреса локальной разработки:
+
+- `http://localhost:5173` и `http://127.0.0.1:5173` — Vite (`npm run dev`);
+- `http://localhost:3000` и `http://127.0.0.1:3000` — стенд `docker compose up`.
+
+Поэтому локально ничего настраивать не нужно: в `docker-compose.yml` переменная не задаётся. В `docker-compose.prod.yml` она обязательна (`${CORS_ORIGINS:?...}`), чтобы прод не стартовал с дев-настройками.
+
+**Как это работает:** для разрешённого origin ответ содержит `access-control-allow-origin` с этим origin. Для чужого заголовка нет, и браузер не даёт сайту прочитать ответ. Сам запрос при этом доходит до сервера и получает 200.
+
+**Когда CORS не задействуется:**
+
+- Если фронт и API отдаются с одного домена через nginx (`/api` проксируется), запросы same-origin. В `CORS_ORIGINS` достаточно указать сам домен.
+- Нативному Android-клиенту CORS не нужен. Если приложение — WebView на Capacitor, добавьте его origin (`https://localhost` или `capacitor://localhost`).
+
+**Ограничения:** CORS защищает только пользователей браузера от запросов с чужих сайтов. От `curl` и скриптов он не защищает: для этого нужны аутентификация и rate limiting (отдельные задачи). Значение `*` разрешает любой сайт и пишет предупреждение в лог, в проде его использовать не стоит.
+
+**Проверка вручную** (PowerShell):
+
+```powershell
+curl.exe -s -D - -o NUL -H "Origin: http://localhost:3000" http://localhost:3000/api/poses
+curl.exe -s -D - -o NUL -H "Origin: https://evil.example.org" http://localhost:3000/api/poses
+```
+
+В первом ответе должен быть `access-control-allow-origin`, во втором нет.
