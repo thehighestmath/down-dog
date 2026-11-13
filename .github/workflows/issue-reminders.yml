@@ -1,6 +1,6 @@
 name: Issue reminders
 
-# Раз в рабочий день напоминает исполнителям про зависшие задачи в статусах
+# Каждый день в 09:00 МСК напоминает исполнителям про зависшие задачи в статусах
 # Todo и In Progress. Бэклог и Done не трогаем. Ничего не закрывает и не
 # переназначает, только пишет комментарий.
 #
@@ -19,8 +19,8 @@ name: Issue reminders
 
 on:
   schedule:
-    # 09:00 по Москве, пн-пт
-    - cron: '0 6 * * 1-5'
+    # 09:00 по Москве, каждый день
+    - cron: '0 6 * * *'
   workflow_dispatch:
 
 permissions: {}
@@ -40,7 +40,7 @@ jobs:
       GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
       OWNER: thehighestmath
       PROJECT_NUMBER: 5
-      STATUSES: "Todo,In Progress"
+      STATUSES: 'Todo,In Progress'
       STALE_DAYS: 3
     steps:
       - name: Remind
