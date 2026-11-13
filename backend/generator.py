@@ -57,10 +57,10 @@ def _fill_time(
 
     while t_max > 0:
         if not pool:
-            pool = list(candidates)
+            pool = [p for p in candidates if p["name_en"] != last_name]
+            if not pool:
+                break
             random.shuffle(pool)
-            if last_name and len(pool) > 1 and pool[0]["name_en"] == last_name:
-                pool.append(pool.pop(0))
 
         pose = pool.pop(0)
         name = pose["name_en"]
