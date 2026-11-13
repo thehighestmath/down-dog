@@ -24,6 +24,26 @@ interface HomeScreenProps {
   onStartWorkout: (w: Workout) => void
 }
 
+// Порог: предупреждаем, если фактическая длительность меньше 80% от запрошенной
+const SHORT_WORKOUT_RATIO = 0.8
+
+function formatActualDuration(workout: Workout): string {
+  if (workout.actual_duration_sec === undefined) {
+    return `${workout.duration_min} мин.`
+  }
+  const mins = Math.floor(workout.actual_duration_sec / 60)
+  const secs = workout.actual_duration_sec % 60
+  if (mins === 0) return `${secs} сек.`
+  if (secs === 0) return `${mins} мин.`
+  return `${mins} мин. ${secs} сек.`
+}
+
+function isNoticeablyShorter(workout: Workout): boolean {
+  if (workout.actual_duration_sec === undefined) return false
+  const requestedSec = workout.duration_min * 60
+  return workout.actual_duration_sec < requestedSec * SHORT_WORKOUT_RATIO
+}
+
 export function HomeScreen({
   poses,
   durationMin,
@@ -62,6 +82,9 @@ export function HomeScreen({
   }, [generatedWorkout, showWarning])
 
   const isPosesEmpty = !generatedWorkout?.poses || generatedWorkout.poses.length === 0
+  const noticeablyShorter = generatedWorkout
+    ? isNoticeablyShorter(generatedWorkout)
+    : false
 
   return (
     <div className={styles.pageContainer}>
@@ -149,8 +172,18 @@ export function HomeScreen({
           </p>
           <p>
             <strong>Параметры:</strong> {generatedWorkout.level} |{' '}
-            {generatedWorkout.focus} | {generatedWorkout.duration_min} мин.
+            {generatedWorkout.focus} | {formatActualDuration(generatedWorkout)}
+            {noticeablyShorter && ` (запрошено ${generatedWorkout.duration_min} мин.)`}
           </p>
+          {noticeablyShorter && (
+            <div className={styles.errorBox}>
+              ⚠️ Для выбранных параметров доступно мало уникальных поз, поэтому
+              тренировка получилась короче запрошенной:{' '}
+              <strong>{formatActualDuration(generatedWorkout)}</strong> вместо{' '}
+              <strong>{generatedWorkout.duration_min} мин.</strong> (мы не повторяем
+              одну и ту же позу подряд).
+            </div>
+          )}
           <h3>Список поз:</h3>
           <ol className={styles.poseList}>
             {generatedWorkout.poses.map((p, i) => (

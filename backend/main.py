@@ -164,12 +164,14 @@ def generate_workout(request: WorkoutRequest) -> dict:
 
     poses = load_poses_from_db()
 
-    workout_poses = tren(
+    generated = tren(
         poses=poses,
         level=request.level,
         duration=request.duration_min * 60,
         focus=request.focus,
     )
+    workout_poses = generated["poses"]
+    actual_duration_sec = generated["actual_duration_sec"]
 
     # -------------------------------------
     # Проверяем, удалось ли сгенерировать позы
@@ -198,6 +200,8 @@ def generate_workout(request: WorkoutRequest) -> dict:
     workout = {
         "id": workout_id,
         "duration_min": request.duration_min,
+        "actual_duration_sec": actual_duration_sec,
+        "actual_duration_min": generated["actual_duration_min"],
         "level": request.level,
         "focus": request.focus,
         "poses": workout_poses,

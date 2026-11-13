@@ -1,3 +1,4 @@
+import math
 import random
 from collections.abc import Callable
 
@@ -38,9 +39,11 @@ def _fill_time(
     t_max: int,
     poses: list[dict],
     difficulty_filter: Callable[[int], bool],
-) -> list[str]:
-    """Заполняет время позами, используя все уникальные позы перед повторами."""
+    last_name: str | None = None,
+) -> tuple[list[str], int, str | None]:
+    """Заполняет время позами без повторов подряд."""
     result: list[str] = []
+    spent_time = 0
 
     candidates = [
         p
@@ -50,10 +53,12 @@ def _fill_time(
     ]
 
     if not candidates:
-        return result
+        return result, spent_time, last_name
+
+    if len(candidates) == 1 and candidates[0]["name_en"] == last_name:
+        return result, spent_time, last_name
 
     pool: list[dict] = []
-    last_name: str | None = None
 
     while t_max > 0:
         if not pool:
@@ -62,28 +67,32 @@ def _fill_time(
                 break
             random.shuffle(pool)
 
-        pose = pool.pop(0)
-        name = pose["name_en"]
-        value = pose["full_cycle_sec"]
-
-        if value <= t_max:
-            result.append(name)
-            t_max -= value
-            last_name = name
-        else:
-            found = False
-            for i, p in enumerate(pool):
-                if p["full_cycle_sec"] <= t_max:
-                    result.append(p["name_en"])
-                    t_max -= p["full_cycle_sec"]
-                    last_name = p["name_en"]
-                    pool.pop(i)
-                    found = True
-                    break
-            if not found:
+        chosen_idx = None
+        for i, p in enumerate(pool):
+            if p["name_en"] != last_name and p["full_cycle_sec"] <= t_max:
+                chosen_idx = i
                 break
 
-    return result
+        if chosen_idx is not None:
+            pose = pool.pop(chosen_idx)
+            name = pose["name_en"]
+            value = pose["full_cycle_sec"]
+
+            result.append(name)
+            t_max -= value
+            spent_time += value
+            last_name = name
+        else:
+            has_other_fitting = any(
+                p["name_en"] != last_name and p["full_cycle_sec"] <= t_max
+                for p in candidates
+            )
+            if has_other_fitting:
+                pool = []
+                continue
+            break
+
+    return result, spent_time, last_name
 
 
 def tren(
@@ -91,10 +100,10 @@ def tren(
     level: str,
     duration: int,
     focus: str | None = None,
-) -> list[str]:
+) -> dict:
     filtered = get_poses_by_focus(poses, focus)
     if not filtered:
-        return []
+        return {"poses": [], "actual_duration_sec": 0, "actual_duration_min": 0}
 
     plans = {
         "beginner": [
@@ -112,7 +121,21 @@ def tren(
     }
 
     result: list[str] = []
-    for diff_filter, num, den in plans.get(level, []):
-        result.extend(_fill_time(duration * num // den, filtered, diff_filter))
+    total_sec = 0
+    last_name: str | None = None
 
-    return result
+    for diff_filter, num, den in plans.get(level, []):
+        block_poses, block_sec, last_name = _fill_time(
+            duration * num // den,
+            filtered,
+            diff_filter,
+            last_name=last_name,
+        )
+        result.extend(block_poses)
+        total_sec += block_sec
+
+    return {
+        "poses": result,
+        "actual_duration_sec": total_sec,
+        "actual_duration_min": math.ceil(total_sec / 60) if total_sec > 0 else 0,
+    }
