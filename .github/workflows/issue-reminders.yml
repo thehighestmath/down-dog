@@ -1,0 +1,123 @@
+name: Issue reminders
+
+# Раз в рабочий день напоминает исполнителям про зависшие задачи в статусах
+# Todo и In Progress. Бэклог и Done не трогаем. Ничего не закрывает и не
+# переназначает, только пишет комментарий.
+#
+# Критерий "зависла": у задачи есть исполнитель, но с момента последнего шага
+# (взятие в работу / комментарий / напоминание) прошло больше STALE_DAYS дней,
+# и к задаче не залинкован ни один открытый или смерженный ПР. Взятие в работу
+# ищем по событию ASSIGNED, ПР — по CROSS_REFERENCED_EVENT в таймлайне.
+#
+# Напоминание повторяется периодически: любой реальный комментарий или ПР
+# сбрасывают таймер, а наше собственное напоминание — нет. Так задача пикается
+# каждые STALE_DAYS дней, пока по ней не появится прогресс.
+#
+# Комментарии пишет github-actions[bot], а не PAT ментора, иначе ментору не
+# пришло бы уведомление об упоминании. Статусы берём из пользовательского
+# проекта, поэтому нужен PROJECT_TOKEN (classic PAT со scope project и repo).
+
+on:
+  schedule:
+    # 09:00 по Москве, пн-пт
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: issue-reminders
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    name: Remind about stale issues
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+      OWNER: thehighestmath
+      PROJECT_NUMBER: 5
+      STATUSES: "Todo,In Progress"
+      STALE_DAYS: 3
+    steps:
+      - name: Remind
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error title=PROJECT_TOKEN::Не задан секрет PROJECT_TOKEN (classic PAT со scope project и repo)"
+            exit 1
+          fi
+
+          # Строки "<номер>\t<@упоминания>\t<дней>" для задач в Todo/In Progress,
+          # где пора напомнить.
+          # $-переменные в одинарных кавычках - переменные GraphQL и jq, не shell
+          # shellcheck disable=SC2016
+          todo=$(gh api graphql --paginate \
+            -f login="$OWNER" -F number="$PROJECT_NUMBER" \
+            -f query='
+              query($login: String!, $number: Int!, $endCursor: String) {
+                user(login: $login) {
+                  projectV2(number: $number) {
+                    items(first: 100, after: $endCursor) {
+                      pageInfo { hasNextPage endCursor }
+                      nodes {
+                        status: fieldValueByName(name: "Status") {
+                          ... on ProjectV2ItemFieldSingleSelectValue { name }
+                        }
+                        content {
+                          ... on Issue {
+                            number
+                            createdAt
+                            assignees(first: 10) { nodes { login __typename } }
+                            crossrefs: timelineItems(last: 20, itemTypes: [CROSS_REFERENCED_EVENT]) {
+                              nodes { ... on CrossReferencedEvent { source { ... on PullRequest { state } } } }
+                            }
+                            assigned: timelineItems(last: 20, itemTypes: [ASSIGNED_EVENT]) {
+                              nodes { ... on AssignedEvent { createdAt } }
+                            }
+                            comments(last: 100) { nodes { createdAt } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }' \
+            --jq '
+              def ts: if . == null then 0 else fromdateiso8601 end;
+              def days_since($t): ((now - $t) / 86400 | floor);
+              (env.STATUSES | split(",")) as $statuses
+              | .data.user.projectV2.items.nodes[]
+              | select(.content.number != null)
+              | .status.name as $status
+              | select($statuses | index($status) != null)
+              | ([.content.assignees.nodes[] | select(.__typename == "User") | .login]) as $assignees
+              | select(($assignees | length) > 0)
+              | select([.content.crossrefs.nodes[].source.state
+                  | select(. == "OPEN" or . == "MERGED")] | length == 0)
+              | ([([.content.assigned.nodes[].createdAt | ts] | max // (.content.createdAt | ts)),
+                   ([.content.comments.nodes[].createdAt | ts] | max // 0)] | max) as $since
+              | select(days_since($since) >= (env.STALE_DAYS | tonumber))
+              | [.content.number, ($assignees | map("@" + .) | join(" ")), days_since($since)]
+              | @tsv')
+
+          sent=0
+          while IFS=$'\t' read -r number mentions days; do
+            [ -n "$number" ] || continue
+            body="<!-- issue-reminders:stale -->"$'\n'
+            body+="$mentions, по задаче #$number уже $days дн. нет прогресса:"
+            body+=" нет новых комментариев и открытых ПР."
+            body+=$'\n'"Что дальше:"
+            body+=$'\n'"- если взял в работу и двигаешься: коротко отпишись в задаче о статусе;"
+            body+=$'\n'"- если застрял: напиши, что не получается, ментор подскажет;"
+            body+=$'\n'"- если не успеваешь или передумал: сними себя с задачи или перенеси дедлайн."
+            gh issue comment "$number" -R "$OWNER/down-dog" --body "$body" >/dev/null
+            echo "Issue #$number: напоминание для $mentions, без прогресса $days дн." \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+            sent=$((sent + 1))
+          done <<<"$todo"
+
+          echo "Отправлено напоминаний: $sent" | tee -a "$GITHUB_STEP_SUMMARY"
