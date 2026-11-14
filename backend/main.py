@@ -71,7 +71,9 @@ def load_poses_from_db() -> list[dict]:
                 "SELECT id, name_ru, name_sanskrit, name_en, category, "
                 "difficulty, focus_areas, contraindications, description, "
                 "image_url, audio_url, hold_time_sec, full_cycle_sec "
-                "FROM poses ORDER BY id"
+                "FROM poses "
+                "WHERE image_url IS NOT NULL AND image_url != '' "
+                "ORDER BY id"
             )
             rows = cursor.fetchall()
             poses = [dict(row) for row in rows]
