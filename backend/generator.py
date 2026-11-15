@@ -1,6 +1,7 @@
 import math
 import random
 from collections.abc import Callable
+from dataclasses import dataclass
 
 
 def get_poses_by_focus(
@@ -35,12 +36,19 @@ def get_poses_by_focus(
     return selected
 
 
+@dataclass
+class FillTimeResult:
+    poses: list[str]
+    spent_time: int
+    last_name: str | None
+
+
 def _fill_time(
     t_max: int,
     poses: list[dict],
     difficulty_filter: Callable[[int], bool],
     last_name: str | None = None,
-) -> tuple[list[str], int, str | None]:
+) -> FillTimeResult:
     """Заполняет время позами без повторов подряд."""
     result: list[str] = []
     spent_time = 0
@@ -53,10 +61,10 @@ def _fill_time(
     ]
 
     if not candidates:
-        return result, spent_time, last_name
+        return FillTimeResult(poses=result, spent_time=spent_time, last_name=last_name)
 
     if len(candidates) == 1 and candidates[0]["name_en"] == last_name:
-        return result, spent_time, last_name
+        return FillTimeResult(poses=result, spent_time=spent_time, last_name=last_name)
 
     pool: list[dict] = []
 
@@ -92,7 +100,7 @@ def _fill_time(
                 continue
             break
 
-    return result, spent_time, last_name
+    return FillTimeResult(poses=result, spent_time=spent_time, last_name=last_name)
 
 
 def tren(
@@ -125,14 +133,15 @@ def tren(
     last_name: str | None = None
 
     for diff_filter, num, den in plans.get(level, []):
-        block_poses, block_sec, last_name = _fill_time(
+        filled = _fill_time(
             duration * num // den,
             filtered,
             diff_filter,
             last_name=last_name,
         )
-        result.extend(block_poses)
-        total_sec += block_sec
+        result.extend(filled.poses)
+        total_sec += filled.spent_time
+        last_name = filled.last_name
 
     return {
         "poses": result,
