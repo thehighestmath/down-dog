@@ -18,6 +18,8 @@ export interface Pose {
 export interface Workout {
   id: string
   duration_min: number
+  actual_duration_sec?: number
+  actual_duration_min?: number
   level: string
   focus: string
   poses: string[]
