@@ -3,6 +3,10 @@ import random
 from collections.abc import Callable
 from dataclasses import dataclass
 
+WARMUP_CATEGORIES = {"warmup"}
+MAIN_CATEGORIES = {"mid", "balancing"}
+COOLDOWN_CATEGORIES = {"cooldown"}
+
 
 def get_poses_by_focus(
     poses: list[dict],
@@ -103,17 +107,36 @@ def _fill_time(
     return FillTimeResult(poses=result, spent_time=spent_time, last_name=last_name)
 
 
+def _select_phase_poses(
+    all_poses: list[dict],
+    focus: str | None,
+    categories: set[str],
+) -> list[dict]:
+    """Возвращает позы нужной категории с учётом фокуса и fallback."""
+    all_in_category = [p for p in all_poses if p.get("category") in categories]
+    if not all_in_category:
+        return []
+
+    focused = get_poses_by_focus(all_in_category, focus)
+    return focused if focused else all_in_category
+
+
 def tren(
     poses: list[dict],
     level: str,
     duration: int,
     focus: str | None = None,
 ) -> dict:
-    filtered = get_poses_by_focus(poses, focus)
-    if not filtered:
-        return {"poses": [], "actual_duration_sec": 0, "actual_duration_min": 0}
+    empty_response = {
+        "poses": [],
+        "phases": [],
+        "actual_duration_sec": 0,
+        "actual_duration_min": 0,
+    }
+    if not poses or duration <= 0:
+        return empty_response
 
-    plans = {
+    main_plans: dict[str, list[tuple[Callable[[int], bool], int, int]]] = {
         "beginner": [
             (lambda d: d <= 2, 1, 1),
         ],
@@ -128,23 +151,65 @@ def tren(
         ],
     }
 
+    if level not in main_plans:
+        return empty_response
+
+    warmup_budget = duration // 5
+    main_budget = (duration * 3) // 5
+    cooldown_budget = duration - warmup_budget - main_budget
+
+    warmup_poses = _select_phase_poses(poses, focus, WARMUP_CATEGORIES)
+    main_poses = _select_phase_poses(poses, focus, MAIN_CATEGORIES)
+    cooldown_poses = _select_phase_poses(poses, focus, COOLDOWN_CATEGORIES)
+
     result: list[str] = []
+    phases: list[str] = []
     total_sec = 0
     last_name: str | None = None
 
-    for diff_filter, num, den in plans.get(level, []):
+    # 1. Разминка (~20%): фаза важнее уровня сложности
+    if warmup_poses and warmup_budget > 0:
         filled = _fill_time(
-            duration * num // den,
-            filtered,
-            diff_filter,
+            warmup_budget,
+            warmup_poses,
+            lambda _d: True,
             last_name=last_name,
         )
         result.extend(filled.poses)
+        phases.extend(["warmup"] * len(filled.poses))
+        total_sec += filled.spent_time
+        last_name = filled.last_name
+
+    # 2. Основная часть (~60%): распределение по уровню сложности
+    if main_poses and main_budget > 0:
+        for diff_filter, num, den in main_plans[level]:
+            filled = _fill_time(
+                main_budget * num // den,
+                main_poses,
+                diff_filter,
+                last_name=last_name,
+            )
+            result.extend(filled.poses)
+            phases.extend(["main"] * len(filled.poses))
+            total_sec += filled.spent_time
+            last_name = filled.last_name
+
+    # 3. Заминка (~20%): фаза важнее уровня сложности
+    if cooldown_poses and cooldown_budget > 0:
+        filled = _fill_time(
+            cooldown_budget,
+            cooldown_poses,
+            lambda _d: True,
+            last_name=last_name,
+        )
+        result.extend(filled.poses)
+        phases.extend(["cooldown"] * len(filled.poses))
         total_sec += filled.spent_time
         last_name = filled.last_name
 
     return {
         "poses": result,
+        "phases": phases,
         "actual_duration_sec": total_sec,
         "actual_duration_min": math.ceil(total_sec / 60) if total_sec > 0 else 0,
     }
