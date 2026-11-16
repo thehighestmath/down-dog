@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { trackPoseViewed } from '../analytics'
-import type { PlaylistItem, Pose, Workout } from '../types'
+import type { PlaylistItem, Pose, Workout, WorkoutPhase } from '../types'
 import { btnStyle } from '../utils/styles'
 import { useWakeLock } from '../useWakeLock'
 import { beep, unlockBeep } from '../beep'
@@ -14,6 +14,19 @@ interface PlayerProps {
   onFinish: () => void
 }
 
+const PHASE_LABELS: Record<WorkoutPhase, string> = {
+  warmup: 'Разминка',
+  main: 'Основная часть',
+  cooldown: 'Заминка',
+}
+
+function categoryToPhase(category?: string): WorkoutPhase | undefined {
+  if (category === 'warmup') return 'warmup'
+  if (category === 'cooldown') return 'cooldown'
+  if (category === 'mid' || category === 'balancing') return 'main'
+  return undefined
+}
+
 export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   const LANG = AudioLang.Ru
   const BEEP_SECONDS = 3
@@ -22,12 +35,13 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
 
   const playlist: PlaylistItem[] = useMemo(
     () =>
-      workout.poses.map((name) => {
+      workout.poses.map((name, idx) => {
         const pose = poseMap.get(name)
         return {
           name,
           pose,
           duration: Math.max(5, pose?.full_cycle_sec ?? 30),
+          phase: workout.phases?.[idx] ?? categoryToPhase(pose?.category),
         }
       }),
     [workout, poseMap],
@@ -197,7 +211,12 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     <div className="player">
       <div className="player__header">
         <div className="player__counter">
-          Поза {currentIdx + 1} / {playlist.length}
+          <span>
+            Поза {currentIdx + 1} / {playlist.length}
+          </span>
+          {current.phase && (
+            <span className="player__phase">{PHASE_LABELS[current.phase]}</span>
+          )}
         </div>
         <div className="player__controls">
           <button

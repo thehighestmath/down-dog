@@ -207,6 +207,7 @@ def generate_workout(request: WorkoutRequest) -> dict:
         "level": request.level,
         "focus": request.focus,
         "poses": workout_poses,
+        "phases": generated["phases"],
     }
 
     save_workout(
