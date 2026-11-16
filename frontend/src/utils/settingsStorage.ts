@@ -20,6 +20,7 @@ const FOCUSES = FOCUS_OPTIONS.map((o) => o.value)
 function pickAllowed<T>(value: unknown, allowed: readonly T[], fallback: T): T {
   return allowed.find((item) => item === value) ?? fallback
 }
+
 // Один ключ на все три значения (в localStorage лежит JSON).
 // С префиксом, чтобы не пересечься с analytics_user_id из PR #40.
 const STORAGE_KEY = 'down-dog:settings'
