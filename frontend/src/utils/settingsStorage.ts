@@ -13,6 +13,13 @@ export const DEFAULT_SETTINGS: Settings = {
   focus: 'full_body',
 }
 
+const LEVELS = LEVEL_OPTIONS.map((o) => o.value)
+const FOCUSES = FOCUS_OPTIONS.map((o) => o.value)
+
+// Возвращает value, если оно есть в списке допустимых, иначе fallback
+function pickAllowed<T>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return allowed.find((item) => item === value) ?? fallback
+}
 // Один ключ на все три значения (в localStorage лежит JSON).
 // С префиксом, чтобы не пересечься с analytics_user_id из PR #40.
 const STORAGE_KEY = 'down-dog:settings'
@@ -29,19 +36,9 @@ export function loadSettings(): Settings {
     const { durationMin, level, focus } = data as Record<string, unknown>
 
     return {
-      durationMin:
-        typeof durationMin === 'number' &&
-        (DURATIONS as readonly number[]).includes(durationMin)
-          ? durationMin
-          : DEFAULT_SETTINGS.durationMin,
-      level:
-        typeof level === 'string' && LEVEL_OPTIONS.some((o) => o.value === level)
-          ? level
-          : DEFAULT_SETTINGS.level,
-      focus:
-        typeof focus === 'string' && FOCUS_OPTIONS.some((o) => o.value === focus)
-          ? focus
-          : DEFAULT_SETTINGS.focus,
+      durationMin: pickAllowed(durationMin, DURATIONS, DEFAULT_SETTINGS.durationMin),
+      level: pickAllowed(level, LEVELS, DEFAULT_SETTINGS.level),
+      focus: pickAllowed(focus, FOCUSES, DEFAULT_SETTINGS.focus),
     }
   } catch {
     // localStorage недоступен или в нём не JSON: работаем со значениями по умолчанию
