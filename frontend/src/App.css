@@ -183,6 +183,11 @@
   }
 }
 
+html,
+body {
+  touch-action: manipulation;
+}
+
 h2 {
   color: black;
 }
