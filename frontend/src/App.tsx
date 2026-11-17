@@ -10,13 +10,15 @@ import { fetchPoses, generateWorkout, getWorkoutById } from './api'
 import { FinishedScreen } from './components/FinishedScreen'
 import { HomeScreen } from './components/HomeScreen'
 import { Player } from './components/Player'
+import { loadSettings, saveSettings } from './utils/settingsStorage'
 import type { Pose, View, Workout } from './types'
 
 function App() {
   const [poses, setPoses] = useState<Pose[]>([])
-  const [durationMin, setDurationMin] = useState(15)
-  const [level, setLevel] = useState('beginner')
-  const [focus, setFocus] = useState('full_body')
+  const [saved] = useState(loadSettings)
+  const [durationMin, setDurationMin] = useState(saved.durationMin)
+  const [level, setLevel] = useState(saved.level)
+  const [focus, setFocus] = useState(saved.focus)
   const [generatedWorkout, setGeneratedWorkout] = useState<Workout | null>(null)
   const [foundWorkout, setFoundWorkout] = useState<Workout | null>(null)
   const [searchId, setSearchId] = useState('')
@@ -34,6 +36,10 @@ function App() {
         setError('Не удалось загрузить позы. Проверьте, запущен ли бэкенд.')
       })
   }, [])
+
+  useEffect(() => {
+    saveSettings({ durationMin, level, focus })
+  }, [durationMin, level, focus])
 
   const handleGenerate = async (e: FormEvent) => {
     e.preventDefault()
