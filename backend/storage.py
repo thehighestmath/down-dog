@@ -1,4 +1,5 @@
 import os
+import re
 from collections.abc import Iterator
 from functools import cache
 from typing import TYPE_CHECKING, Any
@@ -10,6 +11,12 @@ from botocore.exceptions import ClientError
 if TYPE_CHECKING:
     # boto3-stubs нужны только mypy, в контейнере их нет
     from mypy_boto3_s3 import S3Client
+
+_SINGLE_RANGE_RE = re.compile(r"^bytes=(?:\d+-\d*|-\d+)$")
+
+
+class InvalidRangeError(Exception):
+    """Запрошен некорректный или выходящий за пределы файла диапазон байтов."""
 
 
 @cache
@@ -25,13 +32,23 @@ def get_s3_client() -> S3Client:
     )
 
 
-def _get_object(key: str) -> Any | None:
+def _get_object(key: str, range_header: str | None = None) -> Any | None:
     """Объект из бакета или None, если такого ключа нет."""
+    kwargs: dict[str, Any] = {
+        "Bucket": os.environ["BUCKET_NAME"],
+        "Key": key,
+    }
+    if range_header is not None:
+        kwargs["Range"] = range_header
+
     try:
-        return get_s3_client().get_object(Bucket=os.environ["BUCKET_NAME"], Key=key)
+        return get_s3_client().get_object(**kwargs)
     except ClientError as e:
-        if e.response.get("Error", {}).get("Code") in {"NoSuchKey", "404"}:
+        code = e.response.get("Error", {}).get("Code")
+        if code in {"NoSuchKey", "404"}:
             return None
+        if code == "InvalidRange":
+            raise InvalidRangeError(range_header) from e
         raise
 
 
@@ -43,12 +60,19 @@ def get_image(name: str) -> tuple[bytes, str] | None:
     return obj["Body"].read(), obj.get("ContentType") or "application/octet-stream"
 
 
-def get_audio(key: str) -> tuple[Iterator[bytes], int] | None:
-    """Аудиофайл из бакета: (поток чанков, размер в байтах) или None, если его нет.
+def get_audio(
+    key: str, range_header: str | None = None
+) -> tuple[Iterator[bytes], int, str | None] | None:
+    if range_header is not None:
+        range_header = range_header.strip()
+        if not _SINGLE_RANGE_RE.fullmatch(range_header):
+            raise InvalidRangeError(range_header)
 
-    Отдаётся потоком, чтобы не держать весь mp3 в памяти бэкенда.
-    """
-    obj = _get_object(key)
+    obj = _get_object(key, range_header=range_header)
     if obj is None:
         return None
-    return obj["Body"].iter_chunks(), obj["ContentLength"]
+    return (
+        obj["Body"].iter_chunks(),
+        obj["ContentLength"],
+        obj.get("ContentRange"),
+    )

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { trackPoseViewed } from '../analytics'
-import type { PlaylistItem, Pose, Workout } from '../types'
+import type { PlaylistItem, Pose, Workout, WorkoutPhase } from '../types'
 import { btnStyle } from '../utils/styles'
 import { useWakeLock } from '../useWakeLock'
 import { beep, unlockBeep } from '../beep'
 import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
+import { PREFETCH_DELAY_MS, poseImageUrl, prefetchPose } from '../utils/Prefetch'
 import './Player.css'
 
 interface PlayerProps {
@@ -12,6 +13,19 @@ interface PlayerProps {
   poses: Pose[]
   onStop: (poseIndex?: number) => void
   onFinish: () => void
+}
+
+const PHASE_LABELS: Record<WorkoutPhase, string> = {
+  warmup: 'Разминка',
+  main: 'Основная часть',
+  cooldown: 'Заминка',
+}
+
+function categoryToPhase(category?: string): WorkoutPhase | undefined {
+  if (category === 'warmup') return 'warmup'
+  if (category === 'cooldown') return 'cooldown'
+  if (category === 'mid' || category === 'balancing') return 'main'
+  return undefined
 }
 
 export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
@@ -22,12 +36,13 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
 
   const playlist: PlaylistItem[] = useMemo(
     () =>
-      workout.poses.map((name) => {
+      workout.poses.map((name, idx) => {
         const pose = poseMap.get(name)
         return {
           name,
           pose,
           duration: Math.max(5, pose?.full_cycle_sec ?? 30),
+          phase: workout.phases?.[idx] ?? categoryToPhase(pose?.category),
         }
       }),
     [workout, poseMap],
@@ -135,6 +150,14 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     audio.play(poseIntroUrls(item, currentIdx === 0, LANG))
   }, [currentIdx, running, playlist, audio, LANG])
 
+  // Предзагрузка следующей позы: к смене позы картинка и озвучка уже в кэше
+  useEffect(() => {
+    const next = playlist[currentIdx + 1]
+    if (!next) return // последняя поза: ничего не грузим
+    const id = window.setTimeout(() => prefetchPose(next, LANG), PREFETCH_DELAY_MS)
+    return () => window.clearTimeout(id)
+  }, [currentIdx, playlist, LANG])
+
   // Пауза и продолжение озвучки вместе с тренировкой
   useEffect(() => {
     if (running) audio.resume()
@@ -186,7 +209,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   }
 
   if (!current) return null
-  const imageUrl = current.pose?.image_url
+  const imageUrl = poseImageUrl(current)
 
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const ss = String(timeLeft % 60).padStart(2, '0')
@@ -197,7 +220,12 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     <div className="player">
       <div className="player__header">
         <div className="player__counter">
-          Поза {currentIdx + 1} / {playlist.length}
+          <span>
+            Поза {currentIdx + 1} / {playlist.length}
+          </span>
+          {current.phase && (
+            <span className="player__phase">{PHASE_LABELS[current.phase]}</span>
+          )}
         </div>
         <div className="player__controls">
           <button

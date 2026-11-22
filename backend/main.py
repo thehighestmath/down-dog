@@ -9,7 +9,7 @@ import storage
 from analytics import MAX_BODY_BYTES, AnalyticsEvent
 from cors import setup_cors
 from database import get_db_connection
-from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
@@ -166,12 +166,14 @@ def generate_workout(request: WorkoutRequest) -> dict:
 
     poses = load_poses_from_db()
 
-    workout_poses = tren(
+    generated = tren(
         poses=poses,
         level=request.level,
         duration=request.duration_min * 60,
         focus=request.focus,
     )
+    workout_poses = generated["poses"]
+    actual_duration_sec = generated["actual_duration_sec"]
 
     # -------------------------------------
     # Проверяем, удалось ли сгенерировать позы
@@ -200,9 +202,12 @@ def generate_workout(request: WorkoutRequest) -> dict:
     workout = {
         "id": workout_id,
         "duration_min": request.duration_min,
+        "actual_duration_sec": actual_duration_sec,
+        "actual_duration_min": generated["actual_duration_min"],
         "level": request.level,
         "focus": request.focus,
         "poses": workout_poses,
+        "phases": generated["phases"],
     }
 
     save_workout(
@@ -312,13 +317,18 @@ def get_image(name: str) -> Response:
     )
 
 
-# =========================================
+# ============================================================
 # GET /api/audio/{lang}/{kind}/{name}
-# =========================================
+# ============================================================
 
 
 @app.get("/api/audio/{lang}/{kind}/{name}")
-def get_audio(lang: str, kind: str, name: str) -> StreamingResponse:
+def get_audio(
+    lang: str,
+    kind: str,
+    name: str,
+    range_header: Annotated[str | None, Header(alias="Range")] = None,
+) -> StreamingResponse:
     if (
         lang not in AUDIO_LANGS
         or kind not in AUDIO_KINDS
@@ -326,14 +336,39 @@ def get_audio(lang: str, kind: str, name: str) -> StreamingResponse:
     ):
         raise HTTPException(status_code=404, detail="Аудио не найдено")
 
-    audio = storage.get_audio(f"audio/{kind}_{lang}/{name}.mp3")
+    try:
+        audio = storage.get_audio(
+            f"audio/{kind}_{lang}/{name}.mp3",
+            range_header=range_header,
+        )
+    except storage.InvalidRangeError:
+        raise HTTPException(
+            status_code=416,
+            detail="Запрошенный диапазон байтов недоступен",
+        ) from None
 
     if audio is None:
         raise HTTPException(status_code=404, detail="Аудио не найдено")
 
-    chunks, size = audio
+    chunks, size, content_range = audio
+    headers = {
+        "Content-Length": str(size),
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=86400",
+    }
+
+    if content_range is not None:
+        headers["Content-Range"] = content_range
+        return StreamingResponse(
+            chunks,
+            status_code=206,
+            media_type="audio/mpeg",
+            headers=headers,
+        )
+
     return StreamingResponse(
         chunks,
+        status_code=200,
         media_type="audio/mpeg",
-        headers={"Content-Length": str(size)},
+        headers=headers,
     )

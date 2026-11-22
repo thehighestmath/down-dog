@@ -21,11 +21,24 @@
 }
 
 .player__counter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   height: 1.4em;
   margin-bottom: 6px;
   font-size: 14px;
   line-height: 1.4;
-  opacity: 0.7;
+  opacity: 0.85;
+}
+
+.player__phase {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(139, 195, 74, 0.18);
+  color: #a5d6a7;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .player__controls {

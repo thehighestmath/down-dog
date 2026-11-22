@@ -1,3 +1,5 @@
+export type WorkoutPhase = 'warmup' | 'main' | 'cooldown'
+
 export interface Pose {
   id: number
   name_ru: string
@@ -18,9 +20,12 @@ export interface Pose {
 export interface Workout {
   id: string
   duration_min: number
+  actual_duration_sec?: number
+  actual_duration_min?: number
   level: string
   focus: string
   poses: string[]
+  phases?: WorkoutPhase[]
 }
 
 export type View = 'home' | 'player' | 'finished'
@@ -29,4 +34,5 @@ export interface PlaylistItem {
   name: string
   pose: Pose | undefined
   duration: number
+  phase?: WorkoutPhase
 }

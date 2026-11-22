@@ -65,7 +65,7 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           # В push в master пусто: там проверяются только имена файлов
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           echo "ЧТО: имена миграций backend/sql (NN_описание.sql, номера не повторяются);"
           echo "     в ПР - что миграции из master не изменены и не удалены, а номера"
@@ -73,7 +73,15 @@ jobs:
           echo "ЗАЧЕМ: на сервере миграции из master уже применены. Изменённую migrate.py"
           echo "       откажется запускать, а миграция с номером не по порядку применится"
           echo "       на сервере и на чистой БД в разном порядке."
-          if ! python scripts/check_migrations.py ${BASE_SHA:+--base "$BASE_SHA"}; then
+
+          # В ПР HEAD - тестовый merge-коммит, HEAD^1 - master. В push в master
+          # сравнивать не с чем: проверяются только имена файлов.
+          BASE=""
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE="HEAD^1"
+          fi
+
+          if ! python scripts/check_migrations.py ${BASE:+--base "$BASE"}; then
             echo "::error title=SQL-миграции::Проблема с миграциями, подробности в логе шага"
             echo "КАК ИСПРАВИТЬ: верни уже влитые миграции как были, а нужное изменение"
             echo "  (ALTER TABLE, UPDATE ...) оформи новым файлом со следующим номером."
