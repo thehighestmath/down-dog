@@ -9,7 +9,17 @@ import storage
 from analytics import MAX_BODY_BYTES, AnalyticsEvent
 from cors import setup_cors
 from database import get_db_connection
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, Response
+from exceptions import InvalidRangeError
+from fastapi import (
+    Body,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import StreamingResponse
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
@@ -334,21 +344,27 @@ def get_audio(
         or kind not in AUDIO_KINDS
         or not AUDIO_NAME_RE.fullmatch(name)
     ):
-        raise HTTPException(status_code=404, detail="Аудио не найдено")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Audio not found",
+        )
 
     try:
         audio = storage.get_audio(
             f"audio/{kind}_{lang}/{name}.mp3",
             range_header=range_header,
         )
-    except storage.InvalidRangeError:
+    except InvalidRangeError:
         raise HTTPException(
-            status_code=416,
-            detail="Запрошенный диапазон байтов недоступен",
+            status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+            detail="Requested range not satisfiable",
         ) from None
 
     if audio is None:
-        raise HTTPException(status_code=404, detail="Аудио не найдено")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Audio not found",
+        )
 
     chunks, size, content_range = audio
     headers = {
@@ -361,14 +377,14 @@ def get_audio(
         headers["Content-Range"] = content_range
         return StreamingResponse(
             chunks,
-            status_code=206,
+            status_code=status.HTTP_206_PARTIAL_CONTENT,
             media_type="audio/mpeg",
             headers=headers,
         )
 
     return StreamingResponse(
         chunks,
-        status_code=200,
+        status_code=status.HTTP_200_OK,
         media_type="audio/mpeg",
         headers=headers,
     )

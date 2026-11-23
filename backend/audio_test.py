@@ -4,6 +4,7 @@ from typing import Any
 import pytest
 import storage
 from botocore.exceptions import ClientError
+from exceptions import InvalidRangeError
 from fastapi.testclient import TestClient
 from main import app
 
@@ -69,7 +70,7 @@ def test_audio_with_invalid_range_returns_416(
     def fake_get_audio(
         key: str, range_header: str | None = None
     ) -> tuple[Iterator[bytes], int, str | None]:
-        raise storage.InvalidRangeError(range_header)
+        raise InvalidRangeError(range_header)
 
     monkeypatch.setattr(storage, "get_audio", fake_get_audio)
 
@@ -108,7 +109,7 @@ def test_storage_get_audio_invalid_range_raises(
 
     monkeypatch.setattr(storage, "get_s3_client", lambda: FakeS3())
 
-    with pytest.raises(storage.InvalidRangeError):
+    with pytest.raises(InvalidRangeError):
         storage.get_audio("audio/phrases_ru/start.mp3", range_header=bad_range)
 
 
