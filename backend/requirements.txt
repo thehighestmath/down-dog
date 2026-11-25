@@ -1,6 +1,6 @@
-boto3 == 1.43.126
+boto3 == 1.44.3
 python-dotenv == 1.2.4
-fastapi == 0.162.2
+fastapi == 0.163.0
 httpcore == 1.0.9
 httpx == 0.28.1
 pydantic == 2.14.3

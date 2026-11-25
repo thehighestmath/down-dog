@@ -5,6 +5,7 @@ import { btnStyle } from '../utils/styles'
 import { useWakeLock } from '../useWakeLock'
 import { beep, unlockBeep } from '../beep'
 import { AudioLang, AudioQueue, Phrase, phraseUrl, poseIntroUrls } from '../audio'
+import { PREFETCH_DELAY_MS, poseImageUrl, prefetchPose } from '../utils/Prefetch'
 import './Player.css'
 
 interface PlayerProps {
@@ -149,6 +150,14 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
     audio.play(poseIntroUrls(item, currentIdx === 0, LANG))
   }, [currentIdx, running, playlist, audio, LANG])
 
+  // Предзагрузка следующей позы: к смене позы картинка и озвучка уже в кэше
+  useEffect(() => {
+    const next = playlist[currentIdx + 1]
+    if (!next) return // последняя поза: ничего не грузим
+    const id = window.setTimeout(() => prefetchPose(next, LANG), PREFETCH_DELAY_MS)
+    return () => window.clearTimeout(id)
+  }, [currentIdx, playlist, LANG])
+
   // Пауза и продолжение озвучки вместе с тренировкой
   useEffect(() => {
     if (running) audio.resume()
@@ -200,7 +209,7 @@ export function Player({ workout, poses, onStop, onFinish }: PlayerProps) {
   }
 
   if (!current) return null
-  const imageUrl = current.pose?.image_url
+  const imageUrl = poseImageUrl(current)
 
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0')
   const ss = String(timeLeft % 60).padStart(2, '0')

@@ -1,6 +1,8 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Pose, Workout } from '../types'
+import { AudioLang, poseIntroUrls } from '../audio'
+import type { PlaylistItem, Pose, Workout } from '../types'
+import { PREFETCH_DELAY_MS, poseImageUrl } from '../utils/Prefetch'
 import { Player } from './Player'
 
 // Звук, аналитика и wake lock в тестах не нужны: в jsdom их нет,
@@ -18,7 +20,7 @@ vi.mock('../beep', () => ({ beep: vi.fn(), unlockBeep: vi.fn() }))
 vi.mock('../analytics', () => ({ trackPoseViewed: vi.fn() }))
 vi.mock('../useWakeLock', () => ({ useWakeLock: vi.fn() }))
 
-function makePose(id: number, nameEn: string): Pose {
+function makePose(id: number, nameEn: string, imageUrl: string | null = null): Pose {
   return {
     id,
     name_ru: `Поза ${id}`,
@@ -29,7 +31,7 @@ function makePose(id: number, nameEn: string): Pose {
     focus_areas: 'back',
     contraindications: null,
     description: null,
-    image_url: null,
+    image_url: imageUrl,
     audio_url: null,
     audio_name: nameEn,
     hold_time_sec: 30,
@@ -46,10 +48,10 @@ const workout: Workout = {
   poses: ['Mountain', 'Tree'],
 }
 
-function renderPlayer() {
+function renderPlayer(w: Workout = workout, p: Pose[] = poses) {
   const onStop = vi.fn()
   const onFinish = vi.fn()
-  render(<Player workout={workout} poses={poses} onStop={onStop} onFinish={onFinish} />)
+  render(<Player workout={w} poses={p} onStop={onStop} onFinish={onFinish} />)
   return { onStop, onFinish }
 }
 
@@ -100,5 +102,94 @@ describe('Player: кнопки Завершить и Стоп', () => {
     // Индекс нужен для workout_abandoned: на какой позе бросили тренировку
     expect(onStop).toHaveBeenCalledWith(1)
     expect(onFinish).not.toHaveBeenCalled()
+  })
+})
+
+// NF-02: пока идёт поза N, в фоне грузятся картинка и озвучка позы N+1
+const names = ['Mountain', 'Tree', 'Warrior', 'Chair']
+const prefetchPoses = names.map((n, i) => makePose(i + 1, n, `/img/${n}.png`))
+const prefetchWorkout: Workout = { ...workout, poses: names }
+
+describe('Player: предзагрузка следующей позы', () => {
+  const images: string[] = []
+  const sounds: string[] = []
+  const playSpy = vi.fn(() => Promise.resolve())
+
+  // Ресурсы, которые Player должен запросить для позы с номером idx
+  const resourcesOf = (idx: number) => {
+    const item = {
+      name: names[idx],
+      pose: prefetchPoses[idx],
+      duration: 30,
+    } as PlaylistItem
+    return {
+      images: [poseImageUrl(item)],
+      sounds: poseIntroUrls(item, false, AudioLang.Ru),
+    }
+  }
+  const skip = () => fireEvent.click(screen.getByRole('button', { name: /Пропустить/ }))
+  const wait = (ms: number) =>
+    act(() => {
+      vi.advanceTimersByTime(ms)
+    })
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    images.length = 0
+    sounds.length = 0
+    playSpy.mockClear()
+    // Предзагрузка создаёт Image и Audio, но ничего не показывает и не играет
+    vi.stubGlobal(
+      'Image',
+      class {
+        decode = () => Promise.resolve()
+        set src(url: string) {
+          images.push(url)
+        }
+      },
+    )
+    vi.stubGlobal(
+      'Audio',
+      class {
+        preload = ''
+        play = playSpy
+        load() {}
+        set src(url: string) {
+          sounds.push(url)
+        }
+      },
+    )
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it.each([
+    { name: 'после старта: поза 2', skips: 0, target: 1 },
+    { name: 'после «Пропустить»: поза, следующая за новой', skips: 1, target: 2 },
+    { name: 'после быстрой серии «Пропустить»: только итоговая', skips: 2, target: 3 },
+  ])('через 500 мс грузится $name', ({ skips, target }) => {
+    renderPlayer(prefetchWorkout, prefetchPoses)
+    expect(resourcesOf(target).sounds.length).toBeGreaterThan(0)
+    for (let i = 0; i < skips; i++) skip()
+
+    // До истечения задержки ничего не запрашивается: сначала озвучка текущей позы
+    expect({ images, sounds }).toEqual({ images: [], sounds: [] })
+
+    wait(PREFETCH_DELAY_MS)
+    expect({ images, sounds }).toEqual(resourcesOf(target))
+    expect(playSpy).not.toHaveBeenCalled() // загрузка без воспроизведения
+  })
+
+  it('на последней позе ничего лишнего не грузится', () => {
+    renderPlayer(prefetchWorkout, prefetchPoses)
+    skip()
+    skip()
+    skip() // индекс 3: последняя поза
+    wait(PREFETCH_DELAY_MS * 4)
+    expect({ images, sounds }).toEqual({ images: [], sounds: [] })
   })
 })

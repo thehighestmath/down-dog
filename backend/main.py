@@ -9,7 +9,17 @@ import storage
 from analytics import MAX_BODY_BYTES, AnalyticsEvent
 from cors import setup_cors
 from database import get_db_connection
-from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response
+from exceptions import InvalidRangeError
+from fastapi import (
+    Body,
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import StreamingResponse
 from generator import get_poses_by_focus, tren
 from pydantic import BaseModel
@@ -317,28 +327,64 @@ def get_image(name: str) -> Response:
     )
 
 
-# =========================================
+# ============================================================
 # GET /api/audio/{lang}/{kind}/{name}
-# =========================================
+# ============================================================
 
 
 @app.get("/api/audio/{lang}/{kind}/{name}")
-def get_audio(lang: str, kind: str, name: str) -> StreamingResponse:
+def get_audio(
+    lang: str,
+    kind: str,
+    name: str,
+    range_header: Annotated[str | None, Header(alias="Range")] = None,
+) -> StreamingResponse:
     if (
         lang not in AUDIO_LANGS
         or kind not in AUDIO_KINDS
         or not AUDIO_NAME_RE.fullmatch(name)
     ):
-        raise HTTPException(status_code=404, detail="Аудио не найдено")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Audio not found",
+        )
 
-    audio = storage.get_audio(f"audio/{kind}_{lang}/{name}.mp3")
+    try:
+        audio = storage.get_audio(
+            f"audio/{kind}_{lang}/{name}.mp3",
+            range_header=range_header,
+        )
+    except InvalidRangeError:
+        raise HTTPException(
+            status_code=status.HTTP_416_REQUESTED_RANGE_NOT_SATISFIABLE,
+            detail="Requested range not satisfiable",
+        ) from None
 
     if audio is None:
-        raise HTTPException(status_code=404, detail="Аудио не найдено")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Audio not found",
+        )
 
-    chunks, size = audio
+    chunks, size, content_range = audio
+    headers = {
+        "Content-Length": str(size),
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=86400",
+    }
+
+    if content_range is not None:
+        headers["Content-Range"] = content_range
+        return StreamingResponse(
+            chunks,
+            status_code=status.HTTP_206_PARTIAL_CONTENT,
+            media_type="audio/mpeg",
+            headers=headers,
+        )
+
     return StreamingResponse(
         chunks,
+        status_code=status.HTTP_200_OK,
         media_type="audio/mpeg",
-        headers={"Content-Length": str(size)},
+        headers=headers,
     )
