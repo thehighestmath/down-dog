@@ -15,7 +15,7 @@ set -u
 BACKEND_URL=${BACKEND_URL:-http://localhost:8000}
 FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
 MINIO_URL=${MINIO_URL:-http://localhost:9000}
-ADMINER_URL=${ADMINER_URL:-http://localhost:8080}
+ADMINER_URL=${ADMINER_URL:-http://localhost:8090}
 # Команда compose целиком: локально можно добавить -f override.yml
 COMPOSE=${COMPOSE:-docker compose}
 
