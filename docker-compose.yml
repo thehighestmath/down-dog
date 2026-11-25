@@ -9,8 +9,6 @@ services:
   backend:
     build: ./backend
     container_name: app-backend
-    ports:
-      - '8000:8000'
     environment:
       <<: *db-env
       PYTHONUNBUFFERED: '1'
@@ -50,8 +48,6 @@ services:
   frontend:
     build: ./frontend
     container_name: app-frontend
-    ports:
-      - '3000:8080'
     depends_on:
       backend:
         condition: service_healthy
@@ -66,8 +62,6 @@ services:
       POSTGRES_DB: app_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -79,17 +73,6 @@ services:
       - app-network
     restart: unless-stopped
 
-  adminer:
-    image: adminer:6.1.1
-    container_name: app-adminer
-    restart: always
-    ports:
-      - '8090:8080'
-    depends_on:
-      - db
-    networks:
-      - app-network
-
   minio:
     image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     container_name: down-dog-minio
@@ -97,9 +80,6 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - '9000:9000'
-      - '9001:9001'
     volumes:
       - minio_data:/data
     healthcheck:

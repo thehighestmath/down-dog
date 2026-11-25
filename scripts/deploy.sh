@@ -4,6 +4,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# 0. Защита: dev-override (Adminer, открытые наружу порты БД) на сервере загружаться не должен
+if docker compose config --services | grep -qx adminer; then
+  echo "Загружен docker-compose.override.yml. В .env на сервере нужна строка COMPOSE_FILE=docker-compose.prod.yml" >&2
+  exit 1
+fi
+
 # 1. Бэкап перед обновлением: миграции необратимы, откат кода данные не вернёт
 ./scripts/backup.sh
 
