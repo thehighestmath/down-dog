@@ -447,3 +447,174 @@ curl.exe -sI -H "Accept-Encoding: gzip" http://localhost:3000/api/poses
 ```
 
 В ответах смотрите на `Cache-Control` (`immutable` для `assets/`, `no-cache` для `/`) и `Content-Encoding: gzip` у текстовых файлов.
+
+## Деплой на сервер
+
+MVP работает на сервере в `docker compose`. Снаружи его принимает nginx, установленный на самом
+сервере (не в контейнере): он держит HTTPS-сертификат (certbot), сжимает ответы и проксирует запросы
+в контейнеры. На этом же nginx могут жить и другие сайты, у каждого свой файл в
+`/etc/nginx/sites-available/`.
+
+```
+браузер --HTTPS--> nginx на сервере (80, 443, сертификат certbot, сжатие)
+                     |--> frontend (127.0.0.1:8090, nginx в контейнере) --> backend --> Postgres
+```
+
+Сервер: `<хостинг и IP>`, домен: `yoga.pet-projects.pro`, доступ по SSH у: `<кто>`.
+
+Запросы к API (`/api/*`) попадают в backend так: `<описать: через nginx контейнера frontend или иначе>`.
+
+### Первичная настройка (один раз)
+
+1. **DNS.** A-запись домена на IP сервера. Проверка: `nslookup yoga.pet-projects.pro`.
+2. **Код:**
+```bash
+git clone <адрес репозитория> ~/down-dog
+cd ~/down-dog
+```
+3. **Секреты.** `cp .env.example .env`, заполнить значения, `chmod 600 .env`. В `.env` также:
+```
+DOMAIN=yoga.pet-projects.pro
+COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+```
+   `.env` в репозиторий не попадает (он в `.gitignore`). Реальные значения хранятся только на сервере
+   и в менеджере паролей команды: `<где именно>`.
+4. **Запуск:** `docker compose up -d --build`. Порты контейнеров опубликованы только на
+   `127.0.0.1` (`127.0.0.1:<порт>:<порт>` в `docker-compose.prod.yml`): Docker открывает опубликованные
+   порты мимо файрвола, поэтому наружу они смотреть не должны.
+5. **Конфиг nginx для домена.** По образцу соседних сайтов создайте
+   `/etc/nginx/sites-available/yoga`:
+```nginx
+server {
+    server_name yoga.pet-projects.pro;
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_comp_level 5;
+    gzip_types text/css text/javascript application/javascript application/json image/svg+xml;
+
+    location / {
+        proxy_pass http://127.0.0.1:8090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/yoga.pet-projects.pro/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/yoga.pet-projects.pro/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+}
+server {
+    if ($host = yoga.pet-projects.pro) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    listen 80;
+    server_name yoga.pet-projects.pro;
+    return 404; # managed by Certbot
+
+}
+```
+6. **Включить сайт:**
+```bash
+sudo ln -sf /etc/nginx/sites-available/yoga /etc/nginx/sites-enabled/yoga
+sudo nginx -t && sudo systemctl reload nginx
+```
+7. **Сертификат:** `sudo certbot --nginx -d yoga.pet-projects.pro`. Certbot допишет в конфиг `listen 443 ssl`,
+   пути к сертификату и редирект с HTTP на HTTPS. Сначала шаги 5 и 6 (сайт должен быть включён и
+   отвечать по HTTP), потом certbot.
+8. **Бэкапы по расписанию.** Сначала `mkdir -p ~/backups`, затем `crontab -e` и строка:
+```
+0 3 * * * cd $HOME/down-dog && ./scripts/backup.sh >> $HOME/backups/backup.log 2>&1
+```
+9. **Права на скрипты:** `chmod +x scripts/*.sh`.
+### Продление сертификата
+
+Certbot продлевает сертификат сам по таймеру systemd. Проверка:
+
+```bash
+systemctl list-timers | grep certbot
+sudo certbot renew --dry-run
+```
+
+### Выкатка новой версии из master
+
+На сервере:
+
+```bash
+cd ~/down-dog
+./scripts/deploy.sh
+```
+
+Скрипт делает по шагам то, что можно повторить руками:
+
+1. `./scripts/backup.sh`: бэкап БД до обновления (миграции необратимы, откат кода данные не вернёт).
+2. `git fetch origin master && git checkout master && git pull --ff-only origin master`.
+3. `docker compose up -d --build --remove-orphans`: пересборка образов и запуск, миграции применяет сервис `migrate`.
+4. Проверка, что `https://yoga.pet-projects.pro/` отвечает.
+Конфиг nginx на сервере при выкатке обычно менять не нужно. Если изменился файл в
+`/etc/nginx/sites-available/yoga`: `sudo nginx -t && sudo systemctl reload nginx`.
+
+После выкатки откройте сайт с телефона и пройдите тренировку до конца.
+
+### Откат
+
+1. `git log --oneline -5`, найдите коммит последней рабочей версии.
+2. `git checkout <коммит>` и `docker compose up -d --build`.
+3. Если новая версия успела применить миграцию и сломала данные, восстановите БД из бэкапа,
+   сделанного перед выкаткой (см. «Восстановление»).
+### Бэкапы
+
+- **Что:** вся БД Postgres (в том числе аналитика) командой `pg_dump -Fc`, сжатый дамп.
+- **Как часто:** ежедневно в 03:00 (cron) и перед каждой выкаткой.
+- **Куда:** `~/backups/down-dog` на сервере, хранятся 14 дней. Копия вне сервера: задайте
+  `BACKUP_RSYNC_TARGET=<пользователь@хост:/путь/>` в окружении cron, тогда скрипт после каждого
+  бэкапа копирует файл на другую машину. Бэкап только на самом сервере не спасёт, если пропадёт сервер.
+- **Проверка целостности:** скрипт сразу читает свежий дамп (`pg_restore --list`) и удаляет битый файл.
+### Восстановление
+
+Проверка, что из бэкапа можно восстановиться (рабочая БД не меняется):
+
+```bash
+./scripts/restore.sh check ~/backups/down-dog/db_ДАТА.dump
+```
+
+Скрипт восстанавливает дамп во временную БД, печатает число строк в каждой таблице (сверьте, например,
+с таблицей аналитики) и удаляет временную БД.
+
+Восстановление в рабочую БД (перезаписывает данные, перед выполнением попросит подтверждение):
+
+```bash
+./scripts/restore.sh apply ~/backups/down-dog/db_ДАТА.dump
+```
+
+Скрипт останавливает backend, восстанавливает данные и запускает backend снова.
+
+Проверка восстановления выполнена: `<дата>`, дамп `<имя файла>`, результат `<что увидели>`.
+
+### Перезагрузка сервера
+
+У всех сервисов в `docker-compose.prod.yml` стоит `restart: unless-stopped`, а Docker и nginx
+запускаются при загрузке системы. Проверка:
+
+```bash
+systemctl is-enabled docker nginx     # оба enabled
+sudo reboot
+# через минуту:
+docker compose ps                     # все сервисы running
+```
+
+И открыть сайт по HTTPS.
+
+### Если что-то не работает
+
+```bash
+docker compose ps                         # что запущено
+docker compose logs --tail=100 <сервис>
+sudo nginx -t                             # ошибки в конфиге nginx
+sudo tail -n 50 /var/log/nginx/error.log
+```
