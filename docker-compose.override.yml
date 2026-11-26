@@ -1,0 +1,24 @@
+services:
+  backend:
+    ports:
+      - '8000:8000'
+  frontend:
+    ports:
+      - '3000:8080'
+  db:
+    ports:
+      - '5432:5432'
+  minio:
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+  adminer:
+    image: adminer:6.1.1
+    container_name: app-adminer
+    restart: always
+    ports:
+      - '127.0.0.1:${ADMINER_PORT:-8080}:8080'
+    depends_on:
+      - db
+    networks:
+      - app-network
