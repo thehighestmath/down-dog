@@ -467,25 +467,49 @@ MVP работает на сервере в `docker compose`. Снаружи е�
 ### Первичная настройка (один раз)
 
 1. **DNS.** A-запись домена на IP сервера. Проверка: `nslookup yoga.pet-projects.pro`.
-2. **Код:**
-```bash
-git clone <адрес репозитория> ~/down-dog
-cd ~/down-dog
-```
-3. **Секреты.** `cp .env.example .env`, заполнить значения, `chmod 600 .env`. В `.env` также:
-```
-DOMAIN=yoga.pet-projects.pro
-COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
-```
+2. **Доступ к репозиторию и код.** Сервер читает репозиторий по SSH-ключу (deploy key, только чтение).
+   Личный пароль или токен GitHub на сервер вводить не нужно:
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/down-dog-deploy -C "down-dog server" -N ""
+   cat ~/.ssh/down-dog-deploy.pub
+   ```
+   Публичный ключ из вывода добавьте в GitHub: репозиторий, Settings, Deploy keys, Add deploy key
+   (галочку Allow write access не ставить; для этого нужны права администратора репозитория).
+   Затем:
+   ```bash
+   printf 'Host github.com\n  IdentityFile ~/.ssh/down-dog-deploy\n  IdentitiesOnly yes\n' >> ~/.ssh/config
+   chmod 600 ~/.ssh/config
+   ssh -T git@github.com        # при первом подключении ответить yes; ожидается "successfully authenticated"
+   git clone git@github.com:thehighestmath/down-dog.git ~/down-dog
+   cd ~/down-dog
+   ```
+   Если репозиторий уже склонирован по HTTPS:
+   `git remote set-url origin git@github.com:thehighestmath/down-dog.git`.
+3. **Секреты.** `cp .env.example .env`, заполнить значения, `chmod 600 .env`. Помимо секретов в `.env`
+   на сервере должно быть:
+   ```
+   COMPOSE_FILE=docker-compose.prod.yml
+   FRONTEND_PORT=3000
+   CORS_ORIGINS=https://yoga.pet-projects.pro
+   DOMAIN=yoga.pet-projects.pro
+   ```
    `.env` в репозиторий не попадает (он в `.gitignore`). Реальные значения хранятся только на сервере
    и в менеджере паролей команды: `<где именно>`.
-4. **Запуск:** `docker compose up -d --build`. Порты контейнеров опубликованы только на
-   `127.0.0.1` (`127.0.0.1:<порт>:<порт>` в `docker-compose.prod.yml`): Docker открывает опубликованные
-   порты мимо файрвола, поэтому наружу они смотреть не должны.
+
+   `docker-compose.prod.yml` самостоятельный файл, а не дополнение к `docker-compose.yml`, поэтому в
+   `COMPOSE_FILE` указан только он. Эта строка обязательна: без неё `docker compose` подхватит
+   `docker-compose.override.yml` с настройками для разработки, который открывает Postgres (с паролем
+   по умолчанию), MinIO и backend на всех интерфейсах сервера, а Docker обходит файрвол.
+   `scripts/deploy.sh` прерывается, если всё же загружен `docker-compose.override.yml` (проверка по Adminer).
+   `FRONTEND_PORT` - порт на `127.0.0.1`, куда nginx сервера проксирует сайт (по умолчанию 3000,
+   на этом сервере выбран 3000).
+4. **Запуск:** `docker compose up -d --build`. Наружу опубликован только frontend и только на
+   `127.0.0.1:${FRONTEND_PORT}`; Docker открывает опубликованные порты мимо файрвола, поэтому остальные
+   сервисы (Postgres, MinIO, backend) порты не публикуют.
 5. **Конфиг nginx для домена.** По образцу соседних сайтов создайте
    `/etc/nginx/sites-available/yoga`:
-```nginx
-server {
+   ```nginx
+   server {
     server_name yoga.pet-projects.pro;
     gzip on;
     gzip_vary on;
@@ -494,7 +518,7 @@ server {
     gzip_types text/css text/javascript application/javascript application/json image/svg+xml;
 
     location / {
-        proxy_pass http://127.0.0.1:8090;
+        proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -507,31 +531,35 @@ server {
     include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
 
-}
-server {
-    if ($host = yoga.pet-projects.pro) {
-        return 301 https://$host$request_uri;
-    } # managed by Certbot
 
-    listen 80;
-    server_name yoga.pet-projects.pro;
-    return 404; # managed by Certbot
+   }
+   server {
+      if ($host = yoga.pet-projects.pro) {
+         return 301 https://$host$request_uri;
+      } # managed by Certbot
 
-}
-```
+
+      listen 80;
+      server_name yoga.pet-projects.pro;
+      return 404; # managed by Certbot
+
+
+   }
+   ```
 6. **Включить сайт:**
-```bash
-sudo ln -sf /etc/nginx/sites-available/yoga /etc/nginx/sites-enabled/yoga
-sudo nginx -t && sudo systemctl reload nginx
-```
+   ```bash
+   sudo ln -sf /etc/nginx/sites-available/yoga /etc/nginx/sites-enabled/yoga
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
 7. **Сертификат:** `sudo certbot --nginx -d yoga.pet-projects.pro`. Certbot допишет в конфиг `listen 443 ssl`,
    пути к сертификату и редирект с HTTP на HTTPS. Сначала шаги 5 и 6 (сайт должен быть включён и
    отвечать по HTTP), потом certbot.
 8. **Бэкапы по расписанию.** Сначала `mkdir -p ~/backups`, затем `crontab -e` и строка:
-```
-0 3 * * * cd $HOME/down-dog && ./scripts/backup.sh >> $HOME/backups/backup.log 2>&1
-```
+   ```
+   0 3 * * * cd $HOME/down-dog && ./scripts/backup.sh >> $HOME/backups/backup.log 2>&1
+   ```
 9. **Права на скрипты:** `chmod +x scripts/*.sh`.
+
 ### Продление сертификата
 
 Certbot продлевает сертификат сам по таймеру systemd. Проверка:
@@ -556,6 +584,7 @@ cd ~/down-dog
 2. `git fetch origin master && git checkout master && git pull --ff-only origin master`.
 3. `docker compose up -d --build --remove-orphans`: пересборка образов и запуск, миграции применяет сервис `migrate`.
 4. Проверка, что `https://yoga.pet-projects.pro/` отвечает.
+
 Конфиг nginx на сервере при выкатке обычно менять не нужно. Если изменился файл в
 `/etc/nginx/sites-available/yoga`: `sudo nginx -t && sudo systemctl reload nginx`.
 
@@ -567,6 +596,7 @@ cd ~/down-dog
 2. `git checkout <коммит>` и `docker compose up -d --build`.
 3. Если новая версия успела применить миграцию и сломала данные, восстановите БД из бэкапа,
    сделанного перед выкаткой (см. «Восстановление»).
+
 ### Бэкапы
 
 - **Что:** вся БД Postgres (в том числе аналитика) командой `pg_dump -Fc`, сжатый дамп.
@@ -575,6 +605,7 @@ cd ~/down-dog
   `BACKUP_RSYNC_TARGET=<пользователь@хост:/путь/>` в окружении cron, тогда скрипт после каждого
   бэкапа копирует файл на другую машину. Бэкап только на самом сервере не спасёт, если пропадёт сервер.
 - **Проверка целостности:** скрипт сразу читает свежий дамп (`pg_restore --list`) и удаляет битый файл.
+
 ### Восстановление
 
 Проверка, что из бэкапа можно восстановиться (рабочая БД не меняется):
